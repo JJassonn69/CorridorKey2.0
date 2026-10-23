@@ -33,6 +33,7 @@ from .video_io import (
     safe_remove,
     taper_weights,
     window_starts,
+    PrefetchedModelWindowReader,
     SequentialFrameDirWindowReader,
     SequentialVideoWindowReader,
 )
@@ -261,6 +262,25 @@ def load_model(paths: RuntimePaths, device: str = "cuda") -> CorridorKeyV3:
             f"missing={train_missing[:8]} unexpected={train_unexpected[:8]}")
     print(f"  loaded weights; omitted frozen foundation tensors={len(missing)}")
     model.eval()
+    # Runtime consumes the baton and auxiliary alpha, never the training-only
+    # bottleneck prediction. Validate the complete checkpoint before pruning.
+    model.stage1.bottleneck_head_stride = None
+    model.stage1.bottleneck_depatchify = None
+    # Eligible operators already execute in BF16 under inference autocast.
+    # Keep normalization, feature statistics and standalone scales in FP32.
+    # CSwin's sliced QKV path is sensitive to stored parameter precision on
+    # the validated CUDA stack. Preserve its original parameters in every mode.
+    preserve = {child for parent in model.modules()
+                if parent.__class__.__name__ == "CSwinAttention3D"
+                for child in parent.modules()}
+    for module in model.modules():
+        if module in preserve:
+            continue
+        if isinstance(module, (torch.nn.Linear, torch.nn.Conv2d, torch.nn.ConvTranspose2d)):
+            for name in ("weight", "bias"):
+                parameter = getattr(module, name, None)
+                if parameter is not None:
+                    parameter.data = parameter.data.to(dtype=torch.bfloat16)
     del ckpt
     return model
 
@@ -344,9 +364,27 @@ def precompute_rvm_to_memmap(model, source, meta, rvm_path: Path,
     torch.cuda.empty_cache()
 
 
+def _full_foundation_batches(chunks, chunk: int):
+    """Keep the baseline batch shape at the tail using a small overlap.
+
+    Foundations are per-frame, but changing GEMM batch dimensions can change
+    rounding. The last partial batch therefore reuses preceding input frames
+    rather than changing the inference batch size. Short clips stay short.
+    """
+    previous = None
+    for t0, _model, display in chunks:
+        if previous is not None and display.shape[0] < chunk:
+            overlap = chunk - display.shape[0]
+            display = torch.cat((previous[-overlap:], display), dim=0)
+            t0 -= overlap
+        previous = display
+        yield t0, None, display
+
+
 @torch.no_grad()
 def precompute_foundations_to_memmap(model, source, meta, prefix: Path,
-                                     *, chunk: int, reader_kind: str):
+                                     *, chunk: int, reader_kind: str,
+                                     preserve_window_batch: bool = False):
     device = next(model.foundations.parameters()).device
     T_all = int(meta["num_frames"])
     H, W = meta["shape_hw"]
@@ -372,6 +410,8 @@ def precompute_foundations_to_memmap(model, source, meta, prefix: Path,
         chunks = iter_video_frame_chunks(str(source), meta, chunk_size=chunk, need_model=False)
     else:
         chunks = iter_frame_dir_chunks(str(source), meta, chunk_size=chunk, need_model=False)
+    if preserve_window_batch:
+        chunks = _full_foundation_batches(chunks, chunk)
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(_next_or_none, chunks)
         while True:
@@ -461,6 +501,9 @@ def hann_stage1_stream(model, source, meta, *, reader_cls, reader_kind: str,
                                    mode="r", shape=tuple(foundation_paths["cradio_shape"]))
 
     reader = reader_cls(str(source), meta)
+    if foundation_paths is not None:
+        reader = PrefetchedModelWindowReader(
+            reader, ((t0, min(t0 + chunk, T_all)) for t0 in starts))
     hint_reader = make_hint_reader(full_hint_video_path, meta)
     carry_cache = {}
     stage2_frame_cache = {}
@@ -730,6 +773,19 @@ def _render_predictions_torch(meta: dict, outputs: set[str],
     return rendered
 
 
+
+def _release_output_writers(writers):
+    """Drain every output, even if one encoder or disk write failed."""
+    first_error = None
+    for writer in writers.values():
+        try:
+            writer.release()
+        except Exception as exc:
+            if first_error is None:
+                first_error = exc
+    return first_error
+
+
 def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
                   writer_cfg: WriterConfig, *, initial_hint_path: str | None,
                   hint_video_path: str | None):
@@ -790,7 +846,8 @@ def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
                 writers[name] = ExrSequenceWriter(
                     os.path.join(output_dir, f"{clip_name}_{suffix[name]}_exr"),
                     fps, (W_out, H_out), channels=channels,
-                    dtype=cfg.exr_dtype, frame_name=suffix[name])
+                    dtype=cfg.exr_dtype, frame_name=suffix[name],
+                    workers=writer_cfg.exr_workers)
             else:
                 ext = ".mov" if name == "cutout" else ".mp4"
                 channels = 4 if name == "cutout" else 3
@@ -868,6 +925,15 @@ def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
             model.stage1.cuda()
             torch.cuda.empty_cache()
         else:
+            # Reuse per-frame C-RADIO/MoGe features across Hann windows.
+            foundation_paths = precompute_foundations_to_memmap(
+                model, input_path, meta, foundation_prefix,
+                chunk=max(1, int(cfg.hann_chunk)), reader_kind=reader_kind,
+                preserve_window_batch=True)
+            # Foundation inference is complete; release its GPU weight storage
+            # before the temporal and full-resolution reconstruction stages.
+            model.foundations.cpu()
+            torch.cuda.empty_cache()
             model.stage2.cuda()
             model.stage2.eval()
             torch.cuda.empty_cache()
@@ -911,7 +977,10 @@ def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
             baton = np.memmap(
                 baton_path, dtype=np.float16, mode="r",
                 shape=(T_all, model.stage1.d_16, H // 16, W // 16))
-            reader = reader_cls(input_path, meta)
+            reader = PrefetchedModelWindowReader(
+                reader_cls(input_path, meta),
+                ((t0, min(T_all, t0 + stage2_batch))
+                 for t0 in range(0, T_all, stage2_batch)))
             try:
                 for t0 in range(0, T_all, stage2_batch):
                     t1 = min(T_all, t0 + stage2_batch)
@@ -926,12 +995,14 @@ def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
                 reader.close()
                 del baton
     finally:
-        for writer in writers.values():
-            writer.release()
+        inference_failed = sys.exc_info()[0] is not None
+        writer_error = _release_output_writers(writers)
         safe_remove(cfg.temp_dir / f"{raw_clip_name(input_path)}_rvm_feat.f16")
         safe_remove(cfg.temp_dir / f"{raw_clip_name(input_path)}_baton.f16")
         safe_remove(cfg.temp_dir / f"{raw_clip_name(input_path)}_foundation_cradio.f32")
         safe_remove(cfg.temp_dir / f"{raw_clip_name(input_path)}_foundation_moge.f32")
         torch.cuda.empty_cache()
+        if writer_error is not None and not inference_failed:
+            raise writer_error
     print(f"  wrote {len(writers)} output video(s) for {clip_name} "
           f"({T_all} frames @ {W_out}x{H_out})")

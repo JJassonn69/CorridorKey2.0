@@ -31,6 +31,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .rope import RoPE2D, RoPE3D, apply_rotary
+from .depthwise import DepthwiseConv2d, depthwise_conv2d
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +276,7 @@ class SwiGLU(nn.Module):
         self.w_gate = nn.Linear(dim, hidden, bias=bias)
         self.w_up   = nn.Linear(dim, hidden, bias=bias)
         self.dw = (
-            nn.Conv2d(hidden, hidden, kernel_size=int(dw_kernel),
+            DepthwiseConv2d(hidden, hidden, kernel_size=int(dw_kernel),
                       padding=0, groups=hidden, bias=True)
             if dw_kernel and dw_kernel > 0 else None
         )
@@ -387,11 +388,11 @@ class DepthwiseSwiGLU2D(nn.Module):
         max_items = max(1, 1_000_000_000 // max(1, out_elems_per_item))
         if u.shape[0] > max_items:
             y = torch.cat([
-                F.conv2d(u[i:i + max_items], weight, bias=bias, groups=self.dim)
+                depthwise_conv2d(u[i:i + max_items], weight, bias=bias, groups=self.dim)
                 for i in range(0, u.shape[0], max_items)
             ], dim=0)
         else:
-            y = F.conv2d(u, weight, bias=bias, groups=self.dim)
+            y = depthwise_conv2d(u, weight, bias=bias, groups=self.dim)
         y = y.view(y.shape[0], self.dim, 2, y.shape[2], y.shape[3])
         y = y[:, :, 0] * F.silu(y[:, :, 1])
         y = y * self.gamma.to(y.dtype).view(1, -1, 1, 1)
@@ -994,7 +995,7 @@ class QKVDepthwiseSpatial(nn.Module):
         self.kernel_size = int(kernel_size)
         self.pad = self.kernel_size // 2
         channels = 3 * self.dim
-        self.dw = nn.Conv2d(channels, channels, kernel_size=self.kernel_size,
+        self.dw = DepthwiseConv2d(channels, channels, kernel_size=self.kernel_size,
                             padding=0, groups=channels, bias=True)
         with torch.no_grad():
             self.dw.weight.zero_()

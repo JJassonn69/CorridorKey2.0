@@ -29,6 +29,11 @@ import torch.nn as nn
 def build_moge_vitb(device='cuda', checkpoint='Ruicheng/moge-2-vitb-normal'):
     from moge.model.v2 import MoGeModel
     m = MoGeModel.from_pretrained(checkpoint)
+    # CorridorKey consumes encoder features only. These prediction heads are
+    # never called; release them before transferring the encoder to the GPU.
+    for name in ("neck", "points_head", "mask_head", "normal_head", "scale_head"):
+        if hasattr(m, name):
+            delattr(m, name)
     m = m.to(device).eval()
     try:
         m.enable_pytorch_native_sdpa()

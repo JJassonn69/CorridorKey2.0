@@ -7,7 +7,10 @@ import queue
 import shutil
 import subprocess
 import threading
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 os.environ.setdefault("OPENCV_IO_ENABLE_OPENEXR", "1")
@@ -28,6 +31,7 @@ class WriterConfig:
     pix_fmt: str = "yuv444p10le"
     bitrate: str | None = None
     threads: int = 2
+    exr_workers: int = 6
 
 
 def require_ffmpeg(ffmpeg_bin: str) -> None:
@@ -296,9 +300,35 @@ def probe_frame_dir_meta(frame_dir: str, *, num_frames: int,
     return meta
 
 
+@lru_cache(maxsize=1)
+def _u8_video_tables():
+    """Store the original pointwise conversion as exact BF16 bit patterns."""
+    values = np.arange(256, dtype=np.float32) / 255.0
+    review = torch.from_numpy(values).to(dtype=torch.bfloat16)
+    model = torch.from_numpy(cu.linear_to_asinh(cu.srgb_to_linear(values))).to(
+        dtype=torch.bfloat16)
+    tables = tuple(t.view(torch.uint16).numpy().copy() for t in (model, review))
+    for table in tables:
+        table.flags.writeable = False
+    return tables
+
+
 def preprocess_video_frame_views(frame_bgr, meta: dict, *, need_model: bool):
     h_out, w_out = meta["shape_hw"]
     h_model, w_model = meta["model_native_hw"]
+    # Resizing creates non-integer samples; those and adjusted inputs retain
+    # the original arithmetic. Reflection padding commutes with this lookup.
+    if (frame_bgr.dtype == np.uint8 and frame_bgr.ndim == 3
+            and frame_bgr.shape[2] == 3
+            and frame_bgr.shape[:2] == (h_model, w_model)
+            and not has_linear_adjust(meta)):
+        frame = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        frame, _ = center_pad_to_shape(frame, h_out, w_out)
+        model_table, review_table = _u8_video_tables()
+        review = torch.from_numpy(review_table[frame]).view(torch.bfloat16).permute(2, 0, 1)
+        model = (torch.from_numpy(model_table[frame]).view(torch.bfloat16).permute(2, 0, 1)
+                 if need_model else None)
+        return model, review, review
     frame = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
     frame = resize_hwc_lanczos(frame, (h_model, w_model))
     frame, _ = center_pad_to_shape(frame, h_out, w_out)
@@ -366,11 +396,13 @@ class SequentialVideoWindowReader:
                 frame, self.meta, need_model=True)
             self.next_t += 1
 
-    def window(self, t0: int, t1: int):
+    def window(self, t0: int, t1: int, *, model_only: bool = False):
         self._read_until(t1)
         model = torch.stack([self.cache[t][0] for t in range(t0, t1)])
-        foundation = torch.stack([self.cache[t][1] for t in range(t0, t1)])
-        review = torch.stack([self.cache[t][2] for t in range(t0, t1)])
+        foundation = review = None
+        if not model_only:
+            foundation = torch.stack([self.cache[t][1] for t in range(t0, t1)])
+            review = torch.stack([self.cache[t][2] for t in range(t0, t1)])
         for old_t in [k for k in self.cache if k < t0]:
             del self.cache[old_t]
         return model, foundation, review
@@ -393,14 +425,55 @@ class SequentialFrameDirWindowReader:
                 self.paths[self.next_t], self.meta, need_model=True)
             self.next_t += 1
 
-    def window(self, t0: int, t1: int):
+    def window(self, t0: int, t1: int, *, model_only: bool = False):
         self._read_until(t1)
         model = torch.stack([self.cache[t][0] for t in range(t0, t1)])
-        foundation = torch.stack([self.cache[t][1] for t in range(t0, t1)])
-        review = torch.stack([self.cache[t][2] for t in range(t0, t1)])
+        foundation = review = None
+        if not model_only:
+            foundation = torch.stack([self.cache[t][1] for t in range(t0, t1)])
+            review = torch.stack([self.cache[t][2] for t in range(t0, t1)])
         for old_t in [k for k in self.cache if k < t0]:
             del self.cache[old_t]
         return model, foundation, review
+
+
+
+class PrefetchedModelWindowReader:
+    """Prepare one upcoming model-input window while the caller runs inference.
+
+    A single worker owns sequential decoder/cache access. Completed foundation
+    features are supplied separately, so unused display/review stacks are omitted.
+    """
+
+    def __init__(self, reader, windows):
+        self.reader = reader
+        self.windows = iter(windows)
+        self._pool = ThreadPoolExecutor(max_workers=1,
+                                        thread_name_prefix="corridorkey-input")
+        self._closed = False
+        self._expected = None
+        self._future = None
+        self._advance()
+
+    def _advance(self):
+        self._expected = next(self.windows, None)
+        self._future = (self._pool.submit(self.reader.window, *self._expected, model_only=True)
+                        if self._expected is not None else None)
+
+    def window(self, t0, t1):
+        if self._closed or self._expected != (t0, t1):
+            raise RuntimeError(f"Unexpected input window {(t0, t1)}; expected {self._expected}")
+        result = self._future.result()
+        self._advance()
+        return result
+
+    def close(self):
+        if not self._closed:
+            self._closed = True
+            try:
+                self._pool.shutdown(wait=True, cancel_futures=True)
+            finally:
+                self.reader.close()
 
 
 def iter_video_frame_chunks(video_path: str, meta: dict, *, chunk_size: int,
@@ -711,7 +784,7 @@ class ExrSequenceWriter:
 
     def __init__(self, dir_path: str, fps: float, size: tuple[int, int], *,
                  channels: int = 3, dtype: str = "half", maxsize: int = 2,
-                 frame_name: str = "frame"):
+                 frame_name: str = "frame", workers: int = 6):
         if dtype not in ("half", "float"):
             raise ValueError(f"exr dtype must be 'half' or 'float', got {dtype!r}")
         self.dir_path = str(dir_path)
@@ -728,35 +801,32 @@ class ExrSequenceWriter:
         ]
         os.makedirs(self.dir_path, exist_ok=True)
         self.frame_idx = 0
-        self.q = queue.Queue(maxsize=maxsize)
+        if workers < 1 or maxsize < 1:
+            raise ValueError("EXR workers and maxsize must be positive")
+        # Bound queued and running batches so slow disks cannot grow host memory.
+        self._max_pending = workers + maxsize
+        self._pending = deque()
+        self._pool = ThreadPoolExecutor(max_workers=workers,
+                                        thread_name_prefix="corridorkey-exr")
+        self._closed = False
         self.err = None
-        self.thread = threading.Thread(target=self._worker, daemon=True)
-        self.thread.start()
 
-    def _worker(self):
-        try:
-            while True:
-                item = self.q.get()
-                if item is None:
-                    self.q.task_done()
-                    return
-                idx0, arr = item
-                if self.clamp_half:
-                    # float16 overflows to inf above 65504; keep half EXRs finite
-                    arr = np.clip(arr, -65504.0, 65504.0)
-                for j in range(arr.shape[0]):
-                    out_path = os.path.join(
-                        self.dir_path, f"{self.frame_name}_{idx0 + j:06d}.exr")
-                    frame = np.ascontiguousarray(arr[j])
-                    if frame.shape[-1] == 1:
-                        frame = frame[..., 0]
-                    if not cv2.imwrite(out_path, frame, self.imwrite_params):
-                        raise RuntimeError(f"cv2.imwrite failed: {out_path}")
-                self.q.task_done()
-        except Exception as exc:
-            self.err = exc
+    def _write_batch(self, idx0, arr):
+        if self.clamp_half:
+            # float16 overflows to inf above 65504; keep half EXRs finite.
+            arr = np.clip(arr, -65504.0, 65504.0)
+        for j in range(arr.shape[0]):
+            out_path = os.path.join(
+                self.dir_path, f"{self.frame_name}_{idx0 + j:06d}.exr")
+            frame = np.ascontiguousarray(arr[j])
+            if frame.shape[-1] == 1:
+                frame = frame[..., 0]
+            if not cv2.imwrite(out_path, frame, self.imwrite_params):
+                raise RuntimeError(f"cv2.imwrite failed: {out_path}")
 
     def write_many(self, frames: np.ndarray):
+        if self._closed:
+            raise RuntimeError("EXR writer is closed")
         if self.err is not None:
             raise self.err
         arr = np.ascontiguousarray(frames)
@@ -766,15 +836,29 @@ class ExrSequenceWriter:
                 f"{self.channels} channels, got {arr.shape}")
         if arr.dtype != np.float32:
             raise ValueError(f"expected float32 frames, got {arr.dtype}")
-        self.q.put((self.frame_idx, arr))
+        if len(self._pending) >= self._max_pending:
+            try:
+                self._pending.popleft().result()
+            except Exception as exc:
+                self.err = exc
+                raise
+        # Assign filenames on the submitting thread, independent of completion order.
+        self._pending.append(self._pool.submit(self._write_batch, self.frame_idx, arr))
         self.frame_idx += arr.shape[0]
 
     def write(self, frame: np.ndarray):
         self.write_many(frame[None])
 
     def release(self):
-        self.q.put(None)
-        self.thread.join()
+        if not self._closed:
+            self._closed = True
+            self._pool.shutdown(wait=True)
+            while self._pending:
+                try:
+                    self._pending.popleft().result()
+                except Exception as exc:
+                    if self.err is None:
+                        self.err = exc
         if self.err is not None:
             raise self.err
 

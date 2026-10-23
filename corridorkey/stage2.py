@@ -27,6 +27,7 @@ is the tightest-possible attention shape for a 16K-token-per-frame budget
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from .depthwise import DepthwiseConv2d
 
 from .blocks import (
     PatchifyConv, Depatchify, FullSpatialBlock2D, SwinBlock2D, CSwinBlock2D,
@@ -199,7 +200,7 @@ class Refine4ConvNeXtBlock(nn.Module):
                 f"kernel_size must be a positive odd integer; got {kernel_size}")
         hidden = int(round(width * float(expansion)))
         self.pad = kernel_size // 2
-        self.dw = nn.Conv2d(width, width, kernel_size=kernel_size,
+        self.dw = DepthwiseConv2d(width, width, kernel_size=kernel_size,
                             padding=0, groups=width, bias=True)
         self.norm = LayerNorm2d(width)
         self.pw1 = nn.Conv2d(width, hidden, kernel_size=1, bias=True)

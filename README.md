@@ -348,6 +348,11 @@ float32 files, pass:
 --exr_dtype float
 ```
 
+EXR export uses six workers per output. Set `--exr_workers 1` for serial
+writing, or reduce the count when sharing CPU resources. ZIP compression and
+pixel precision are unchanged. See [inference performance](docs/performance.md)
+for measurements and exact-output validation.
+
 Effective precision note: the network itself runs in bfloat16 (in the asinh
 HDR domain), which bounds output accuracy to roughly 1–2% relative error
 through most of the HDR range regardless of the EXR pixel type. `half` adds

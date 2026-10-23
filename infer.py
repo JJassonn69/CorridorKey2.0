@@ -98,6 +98,8 @@ def main():
                           "linear OpenEXR image sequences (full HDR float)."))
     ap.add_argument("--exr_dtype", choices=("half", "float"), default="half",
                     help="EXR pixel type for --output_format exr. Default: half.")
+    ap.add_argument("--exr_workers", type=int, default=6,
+                    help="Parallel lossless EXR writers per output (default: 6; use 1 for serial writing).")
     ap.add_argument("--ffmpeg_bin", default="ffmpeg")
     ap.add_argument("--ffmpeg_codec", default="libx264")
     ap.add_argument("--crf", type=int, default=12)
@@ -116,6 +118,8 @@ def main():
     ap.add_argument("--low_vram_full_attn_query_chunk_tokens", type=int,
                     default=2048)
     args = ap.parse_args()
+    if args.exr_workers < 1:
+        ap.error("--exr_workers must be positive")
 
     if not torch.cuda.is_available():
         raise RuntimeError("CorridorKey v2 runtime requires a CUDA GPU.")
@@ -130,6 +134,7 @@ def main():
         pix_fmt=args.pix_fmt,
         bitrate=args.bitrate,
         threads=args.ffmpeg_threads,
+        exr_workers=args.exr_workers,
     )
     # With no explicit memory settings, pick them per clip from free GPU memory.
     auto_vram = args.hann_chunk is None and args.hann_stride is None and not args.low_vram
