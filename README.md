@@ -353,6 +353,10 @@ writing, or reduce the count when sharing CPU resources. ZIP compression and
 pixel precision are unchanged. See [inference performance](docs/performance.md)
 for measurements and exact-output validation.
 
+The [shared service proposal](docs/service/README.md) covers a planned HTTP API,
+GPU worker pool and CLI client for future editor integrations. It is a design,
+not an implemented service.
+
 Effective precision note: the network itself runs in bfloat16 (in the asinh
 HDR domain), which bounds output accuracy to roughly 1–2% relative error
 through most of the HDR range regardless of the EXR pixel type. `half` adds

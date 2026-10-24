@@ -1,0 +1,2182 @@
+{
+  "openapi": "3.1.2",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "CorridorKey shared inference API",
+    "version": "0.1.0-proposal",
+    "description": "Design only. M1 contract for a single-host service with a configurable qualified worker pool. Media/job schemas are independent of the PyTorch worker. See api.md and README.md for semantic validation, ownership, cancellation and retention rules."
+  },
+  "servers": [
+    {
+      "url": "https://corridorkey.example.invalid",
+      "description": "Placeholder; no service is deployed."
+    }
+  ],
+  "security": [
+    {
+      "ServiceToken": []
+    }
+  ],
+  "paths": {
+    "/v1/capabilities": {
+      "get": {
+        "operationId": "getCapabilities",
+        "summary": "Discover enabled service capabilities.",
+        "responses": {
+          "200": {
+            "description": "Discover enabled service capabilities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/v1/assets": {
+      "post": {
+        "operationId": "createAsset",
+        "summary": "Reserve asset and upload slots.",
+        "responses": {
+          "201": {
+            "description": "Reserve asset and upload slots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "200": {
+            "description": "Idempotent replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetCreate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ]
+      }
+    },
+    "/v1/assets/{asset_id}": {
+      "parameters": [
+        {
+          "name": "asset_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getAsset",
+        "summary": "Read asset upload/validation/deletion state.",
+        "responses": {
+          "200": {
+            "description": "Read asset upload/validation/deletion state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAsset",
+        "summary": "Revoke asset access and purge dependants.",
+        "responses": {
+          "202": {
+            "description": "Revoke asset access and purge dependants.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deletion"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/v1/assets/{asset_id}/complete": {
+      "parameters": [
+        {
+          "name": "asset_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "completeAsset",
+        "summary": "Freeze uploads and validate media.",
+        "responses": {
+          "202": {
+            "description": "Freeze uploads and validate media.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "200": {
+            "description": "Idempotent replay or terminal no-op.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs": {
+      "post": {
+        "operationId": "submitJob",
+        "summary": "Submit one immutable processing job.",
+        "responses": {
+          "202": {
+            "description": "Submit one immutable processing job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "$ref": "#/components/headers/Location"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "200": {
+            "description": "Same idempotent resource, current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobCreate"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ]
+      }
+    },
+    "/v1/jobs/{job_id}": {
+      "parameters": [
+        {
+          "name": "job_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getJob",
+        "summary": "Poll job or deletion status.",
+        "responses": {
+          "200": {
+            "description": "Poll job or deletion status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "304": {
+            "description": "Unchanged.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Retry-After": {
+                "$ref": "#/components/headers/RetryAfter"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteJob",
+        "summary": "Cancel and purge job output.",
+        "responses": {
+          "202": {
+            "description": "Cancel and purge job output.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deletion"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/cancel": {
+      "parameters": [
+        {
+          "name": "job_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "cancelJob",
+        "summary": "Request cancellation; terminal jobs are unchanged.",
+        "responses": {
+          "202": {
+            "description": "Request cancellation; terminal jobs are unchanged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "200": {
+            "description": "Idempotent replay or terminal no-op.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/retry": {
+      "parameters": [
+        {
+          "name": "job_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "retryJob",
+        "summary": "Create a new job from a failed/cancelled job with retained inputs.",
+        "responses": {
+          "202": {
+            "description": "Create a new job from a failed/cancelled job with retained inputs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "200": {
+            "description": "Idempotent replay or terminal no-op.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/result": {
+      "parameters": [
+        {
+          "name": "job_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getResult",
+        "summary": "Get a completed immutable result manifest.",
+        "responses": {
+          "200": {
+            "description": "Get a completed immutable result manifest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    },
+    "/v1/uploads/{upload_id}": {
+      "parameters": [
+        {
+          "name": "upload_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "head": {
+        "operationId": "headUpload",
+        "summary": "Read upload offset and expiry.",
+        "responses": {
+          "200": {
+            "description": "Read upload offset and expiry.",
+            "headers": {
+              "Tus-Resumable": {
+                "$ref": "#/components/headers/TusResumable"
+              },
+              "Upload-Offset": {
+                "$ref": "#/components/headers/UploadOffset"
+              },
+              "Upload-Length": {
+                "$ref": "#/components/headers/UploadLength"
+              },
+              "Upload-Expires": {
+                "$ref": "#/components/headers/UploadExpires"
+              },
+              "Cache-Control": {
+                "$ref": "#/components/headers/NoStore"
+              }
+            }
+          },
+          "default": {
+            "description": "Error status and headers only; HEAD responses have no body."
+          },
+          "412": {
+            "description": "Unsupported tus version.",
+            "headers": {
+              "Tus-Resumable": {
+                "$ref": "#/components/headers/TusResumable"
+              },
+              "Tus-Version": {
+                "$ref": "#/components/headers/TusVersion"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Tus-Resumable",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1.0.0"
+            }
+          }
+        ],
+        "description": "Owner authentication required. tus headers apply also to error responses; HEAD has no response body. Enforce protocol requirements in addition to this schema."
+      },
+      "patch": {
+        "operationId": "patchUpload",
+        "summary": "Append bytes at the expected upload offset.",
+        "responses": {
+          "204": {
+            "description": "Append bytes at the expected upload offset.",
+            "headers": {
+              "Tus-Resumable": {
+                "$ref": "#/components/headers/TusResumable"
+              },
+              "Upload-Offset": {
+                "$ref": "#/components/headers/UploadOffset"
+              },
+              "Upload-Expires": {
+                "$ref": "#/components/headers/UploadExpires"
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "description": "Wrong offset; no bytes appended.",
+            "headers": {
+              "Tus-Resumable": {
+                "$ref": "#/components/headers/TusResumable"
+              }
+            }
+          },
+          "412": {
+            "description": "Unsupported tus version.",
+            "headers": {
+              "Tus-Resumable": {
+                "$ref": "#/components/headers/TusResumable"
+              },
+              "Tus-Version": {
+                "$ref": "#/components/headers/TusVersion"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Tus-Resumable",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1.0.0"
+            }
+          },
+          {
+            "name": "Upload-Offset",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/offset+octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "description": "Owner authentication required. tus headers apply also to error responses; HEAD has no response body. Enforce protocol requirements in addition to this schema."
+      },
+      "delete": {
+        "operationId": "abortUpload",
+        "summary": "Terminate an incomplete file; invalidate its asset.",
+        "responses": {
+          "204": {
+            "description": "Terminate an incomplete file; invalidate its asset.",
+            "headers": {
+              "Tus-Resumable": {
+                "$ref": "#/components/headers/TusResumable"
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "412": {
+            "description": "Unsupported tus version.",
+            "headers": {
+              "Tus-Resumable": {
+                "$ref": "#/components/headers/TusResumable"
+              },
+              "Tus-Version": {
+                "$ref": "#/components/headers/TusVersion"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Tus-Resumable",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1.0.0"
+            }
+          }
+        ],
+        "description": "Owner authentication required. tus headers apply also to error responses; HEAD has no response body. Enforce protocol requirements in addition to this schema."
+      },
+      "options": {
+        "operationId": "uploadOptions",
+        "summary": "Discover tus transfer support.",
+        "responses": {
+          "204": {
+            "description": "Discover tus transfer support.",
+            "headers": {
+              "Tus-Version": {
+                "$ref": "#/components/headers/TusVersion"
+              },
+              "Tus-Extension": {
+                "$ref": "#/components/headers/TusExtension"
+              },
+              "Tus-Max-Size": {
+                "$ref": "#/components/headers/TusMaxSize"
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "security": []
+      }
+    },
+    "/v1/jobs/{job_id}/files/{file_id}": {
+      "parameters": [
+        {
+          "name": "job_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "name": "file_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getResultFile",
+        "summary": "Read a temporary authenticated result file.",
+        "responses": {
+          "200": {
+            "description": "Read a temporary authenticated result file.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Accept-Ranges": {
+                "schema": {
+                  "const": "bytes"
+                }
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            },
+            "content": {
+              "image/x-exr": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "206": {
+            "description": "Requested byte range.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Accept-Ranges": {
+                "schema": {
+                  "const": "bytes"
+                }
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              },
+              "Content-Range": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "image/x-exr": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Requested range cannot be satisfied."
+          }
+        },
+        "parameters": [
+          {
+            "name": "Range",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Range",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "head": {
+        "operationId": "headResultFile",
+        "summary": "Read a temporary authenticated result file.",
+        "responses": {
+          "200": {
+            "description": "Read a temporary authenticated result file.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              },
+              "Accept-Ranges": {
+                "schema": {
+                  "const": "bytes"
+                }
+              },
+              "Content-Length": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "Cache-Control": {
+                "schema": {
+                  "const": "private, no-store"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error status and headers only; HEAD responses have no body."
+          }
+        }
+      }
+    },
+    "/v1/deletions/{deletion_id}": {
+      "parameters": [
+        {
+          "name": "deletion_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getDeletion",
+        "summary": "Read physical deletion status.",
+        "responses": {
+          "200": {
+            "description": "Owner-scoped cleanup status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deletion"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Problem"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ServiceToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Expiring/revocable user service token; never a GitHub credential. Opaque IDs do not confer access."
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128
+        },
+        "description": "Persist with the logical operation. Scope: user + method + route; seven-day retention."
+      }
+    },
+    "headers": {
+      "ETag": {
+        "description": "Strong resource validator.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "RetryAfter": {
+        "description": "Polling/backoff delay in seconds.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "TusResumable": {
+        "description": "tus protocol version.",
+        "schema": {
+          "const": "1.0.0"
+        }
+      },
+      "TusVersion": {
+        "description": "Supported tus versions.",
+        "schema": {
+          "const": "1.0.0"
+        }
+      },
+      "TusExtension": {
+        "description": "Enabled tus extensions.",
+        "schema": {
+          "const": "expiration,termination"
+        }
+      },
+      "TusMaxSize": {
+        "description": "Maximum upload size in bytes.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "UploadOffset": {
+        "description": "Durably acknowledged byte count.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "UploadLength": {
+        "description": "Declared file byte length.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "UploadExpires": {
+        "description": "Upload expiry as an HTTP-date, not JSON RFC3339.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "NoStore": {
+        "description": "Private mutable metadata must not be cached by intermediaries.",
+        "schema": {
+          "const": "no-store"
+        }
+      },
+      "Location": {
+        "description": "Resource URL.",
+        "schema": {
+          "type": "string",
+          "format": "uri-reference"
+        }
+      }
+    },
+    "responses": {
+      "Problem": {
+        "description": "Structured error. Retry only when retryable and honor Retry-After.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "$ref": "#/components/headers/RetryAfter"
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9_-]+$"
+      },
+      "Sha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "DateTime": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "Ticks": {
+        "type": "string",
+        "pattern": "^-?[0-9]+$",
+        "description": "Signed integer ticks, encoded as a string to preserve 64-bit precision."
+      },
+      "PositiveTicks": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*$"
+      },
+      "Rational": {
+        "type": "object",
+        "properties": {
+          "num": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "den": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          }
+        },
+        "required": [
+          "num",
+          "den"
+        ],
+        "additionalProperties": false
+      },
+      "FrameRange": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "description": "Zero-based presentation indices, [start,end). Semantic validation requires start < end <= asset.frame_count.",
+        "additionalProperties": false
+      },
+      "Timing": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "const": "cfr"
+          },
+          "frame_rate": {
+            "$ref": "#/components/schemas/Rational"
+          },
+          "time_base": {
+            "$ref": "#/components/schemas/Rational"
+          },
+          "start_pts": {
+            "$ref": "#/components/schemas/Ticks"
+          },
+          "frame_duration_ticks": {
+            "$ref": "#/components/schemas/PositiveTicks"
+          },
+          "source_timecode": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "mode",
+          "frame_rate",
+          "time_base",
+          "start_pts",
+          "frame_duration_ticks"
+        ],
+        "description": "Frame i PTS = start_pts + i * frame_duration_ticks. Time base times duration must equal reciprocal frame rate. Timecode is informational.",
+        "additionalProperties": false
+      },
+      "InputColour": {
+        "type": "object",
+        "properties": {
+          "primaries": {
+            "const": "bt709"
+          },
+          "white_point": {
+            "const": "D65"
+          },
+          "transfer": {
+            "const": "srgb"
+          },
+          "matrix": {
+            "const": "rgb"
+          },
+          "range": {
+            "const": "full"
+          },
+          "pixel_type": {
+            "const": "uint8"
+          },
+          "alpha": {
+            "const": "none"
+          },
+          "transform_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "primaries",
+          "white_point",
+          "transfer",
+          "matrix",
+          "range",
+          "pixel_type",
+          "alpha",
+          "transform_id"
+        ],
+        "description": "M1 canonical RGB PNG input; transform_id identifies adapter colour conversion, or identity-srgb-v1.",
+        "additionalProperties": false
+      },
+      "Geometry": {
+        "type": "object",
+        "properties": {
+          "pixel_aspect": {
+            "type": "object",
+            "properties": {
+              "num": {
+                "const": 1
+              },
+              "den": {
+                "const": 1
+              }
+            },
+            "required": [
+              "num",
+              "den"
+            ],
+            "additionalProperties": false
+          },
+          "scan": {
+            "const": "progressive"
+          },
+          "rotation_degrees": {
+            "const": 0
+          }
+        },
+        "required": [
+          "pixel_aspect",
+          "scan",
+          "rotation_degrees"
+        ],
+        "additionalProperties": false
+      },
+      "InputFile": {
+        "type": "object",
+        "properties": {
+          "frame_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "media_type": {
+            "const": "image/png"
+          }
+        },
+        "required": [
+          "frame_index",
+          "bytes",
+          "sha256",
+          "media_type"
+        ],
+        "additionalProperties": false
+      },
+      "AssetCreate": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "const": "image_sequence"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "frame_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timing": {
+            "$ref": "#/components/schemas/Timing"
+          },
+          "colour": {
+            "$ref": "#/components/schemas/InputColour"
+          },
+          "geometry": {
+            "$ref": "#/components/schemas/Geometry"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InputFile"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "kind",
+          "width",
+          "height",
+          "frame_count",
+          "timing",
+          "colour",
+          "geometry",
+          "files"
+        ],
+        "description": "Files must contain exactly frame_count unique contiguous indices 0..frame_count-1. Validate advertised byte/pixel/frame limits before reserving storage.",
+        "additionalProperties": false
+      },
+      "UploadSlot": {
+        "type": "object",
+        "properties": {
+          "frame_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "file_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "upload_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "upload_url": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/DateTime"
+          }
+        },
+        "required": [
+          "frame_index",
+          "file_id",
+          "upload_id",
+          "upload_url",
+          "bytes",
+          "expires_at"
+        ]
+      },
+      "Asset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "uploading",
+              "validating",
+              "ready",
+              "invalid",
+              "deleting",
+              "deleted",
+              "expired"
+            ]
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/AssetCreate"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UploadSlot"
+            },
+            "minItems": 1
+          },
+          "content_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "error": {
+            "$ref": "#/components/schemas/Problem"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "manifest",
+          "files",
+          "created_at",
+          "expires_at"
+        ],
+        "description": "Canonical digest covers verified media bytes, ordered frame mapping and normalized metadata. It is present after validation; active jobs pin the source beyond its scheduled TTL."
+      },
+      "Context": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "const": "entire_asset"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "OutputSpec": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "const": "exr_sequence"
+          },
+          "pixel_type": {
+            "const": "float32"
+          },
+          "compression": {
+            "const": "zip"
+          },
+          "channels": {
+            "const": [
+              "alpha",
+              "fg"
+            ]
+          },
+          "colour_space": {
+            "const": "linear_srgb"
+          },
+          "foreground_alpha": {
+            "const": "straight"
+          }
+        },
+        "required": [
+          "format",
+          "pixel_type",
+          "compression",
+          "channels",
+          "colour_space",
+          "foreground_alpha"
+        ],
+        "additionalProperties": false
+      },
+      "JobCreate": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "capabilities_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "full"
+            ]
+          },
+          "output_range": {
+            "$ref": "#/components/schemas/FrameRange"
+          },
+          "context": {
+            "$ref": "#/components/schemas/Context"
+          },
+          "output": {
+            "$ref": "#/components/schemas/OutputSpec"
+          }
+        },
+        "required": [
+          "asset_id",
+          "capabilities_revision",
+          "model_revision",
+          "profile_id",
+          "purpose",
+          "output_range",
+          "context",
+          "output"
+        ],
+        "description": "M1 preview and full share the same native-quality execution. Preview changes delivered range only. Reject unavailable revisions/profiles; never silently select another one.",
+        "additionalProperties": false
+      },
+      "Progress": {
+        "type": "object",
+        "properties": {
+          "phase": {
+            "type": "string",
+            "enum": [
+              "waiting",
+              "loading",
+              "prepass",
+              "stage1",
+              "stage2",
+              "export",
+              "finalizing",
+              "cleanup"
+            ]
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "frames",
+              "windows",
+              "files",
+              "steps"
+            ]
+          },
+          "heartbeat_at": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "eta_seconds": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "phase",
+          "completed",
+          "total",
+          "unit",
+          "heartbeat_at",
+          "eta_seconds"
+        ],
+        "description": "Counters describe the current attempt/phase; stage phases can interleave. ETA is null until calibrated."
+      },
+      "QueueInfo": {
+        "type": "object",
+        "properties": {
+          "position_estimate": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "poll_after_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "active_gpu_jobs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_active_gpu_jobs": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "position_estimate",
+          "poll_after_seconds",
+          "active_gpu_jobs",
+          "max_active_gpu_jobs"
+        ]
+      },
+      "EffectiveRecipe": {
+        "type": "object",
+        "properties": {
+          "model_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "profile_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "execution_fingerprint": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "asset_content_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "processed_range": {
+            "$ref": "#/components/schemas/FrameRange"
+          },
+          "output_range": {
+            "$ref": "#/components/schemas/FrameRange"
+          },
+          "output": {
+            "$ref": "#/components/schemas/OutputSpec"
+          }
+        },
+        "required": [
+          "model_revision",
+          "profile_id",
+          "execution_fingerprint",
+          "asset_content_sha256",
+          "processed_range",
+          "output_range",
+          "output"
+        ]
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "cancel_requested",
+              "succeeded",
+              "failed",
+              "cancelled",
+              "expired",
+              "deleting",
+              "deleted"
+            ]
+          },
+          "request": {
+            "$ref": "#/components/schemas/JobCreate"
+          },
+          "recipe": {
+            "$ref": "#/components/schemas/EffectiveRecipe"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retry_of": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/Progress"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/QueueInfo"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "result_url": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "result_expires_at": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "error": {
+            "$ref": "#/components/schemas/Problem"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "request",
+          "recipe",
+          "attempt",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "OutputFile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "source_frame": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pts": {
+            "$ref": "#/components/schemas/Ticks"
+          },
+          "duration_ticks": {
+            "$ref": "#/components/schemas/PositiveTicks"
+          },
+          "output": {
+            "type": "string",
+            "enum": [
+              "alpha",
+              "fg"
+            ]
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "A",
+                "R",
+                "G",
+                "B"
+              ]
+            },
+            "minItems": 1
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pixel_type": {
+            "const": "float32"
+          },
+          "colour_space": {
+            "type": "string",
+            "enum": [
+              "coverage",
+              "linear_srgb"
+            ]
+          },
+          "alpha_association": {
+            "type": "string",
+            "enum": [
+              "coverage",
+              "straight"
+            ]
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "download_url": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/DateTime"
+          }
+        },
+        "required": [
+          "id",
+          "source_frame",
+          "pts",
+          "duration_ticks",
+          "output",
+          "channels",
+          "width",
+          "height",
+          "pixel_type",
+          "colour_space",
+          "alpha_association",
+          "bytes",
+          "sha256",
+          "download_url",
+          "expires_at"
+        ],
+        "description": "Alpha: channels [A], coverage, coverage association. Foreground: [R,G,B], linear_srgb, straight. Server validates cross-field combinations."
+      },
+      "Result": {
+        "type": "object",
+        "properties": {
+          "schema_version": {
+            "const": "v1"
+          },
+          "job_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "result_fingerprint": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "recipe": {
+            "$ref": "#/components/schemas/EffectiveRecipe"
+          },
+          "timing": {
+            "$ref": "#/components/schemas/Timing"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OutputFile"
+            },
+            "minItems": 1
+          },
+          "expires_at": {
+            "$ref": "#/components/schemas/DateTime"
+          }
+        },
+        "required": [
+          "schema_version",
+          "job_id",
+          "result_fingerprint",
+          "recipe",
+          "timing",
+          "files",
+          "expires_at"
+        ],
+        "description": "Published atomically only after complete export and checksum validation. Exactly one alpha and fg file for each emitted source frame; preserve source PTS. URLs require bearer authentication."
+      },
+      "Deletion": {
+        "type": "object",
+        "properties": {
+          "resource_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "deleting",
+              "deleted",
+              "failed"
+            ]
+          },
+          "requested_at": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "status_url": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "resource_type": {
+            "type": "string",
+            "enum": [
+              "asset",
+              "job"
+            ]
+          },
+          "completed_at": {
+            "$ref": "#/components/schemas/DateTime"
+          },
+          "error": {
+            "$ref": "#/components/schemas/Problem"
+          }
+        },
+        "required": [
+          "id",
+          "resource_id",
+          "resource_type",
+          "state",
+          "requested_at",
+          "status_url"
+        ],
+        "description": "Access is revoked immediately. Poll the dedicated deletion status URL after the source becomes a tombstone; deleted means physical cleanup and dependent-result removal have completed. Failure leaves access revoked."
+      },
+      "Profile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "model_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "execution_fingerprint": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "quality_policy": {
+            "const": "baseline_exact"
+          },
+          "hann_chunk": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "hann_stride": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "stage2_batch": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "model_scale": {
+            "const": 1
+          },
+          "low_vram": {
+            "type": "boolean"
+          },
+          "max_width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_context_frames": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_output_frames": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "qualification": {
+            "type": "object",
+            "required": [
+              "state",
+              "suite_revision",
+              "gpu_class",
+              "execution_stack"
+            ],
+            "properties": {
+              "state": {
+                "const": "qualified"
+              },
+              "suite_revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "gpu_class": {
+                "type": "string",
+                "minLength": 1
+              },
+              "execution_stack": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "description": "Identifies the completed validation matrix behind the advertised profile, not a claim of exactness on arbitrary future hardware."
+          }
+        },
+        "required": [
+          "id",
+          "model_revision",
+          "execution_fingerprint",
+          "quality_policy",
+          "hann_chunk",
+          "hann_stride",
+          "stage2_batch",
+          "model_scale",
+          "low_vram",
+          "max_width",
+          "max_height",
+          "max_context_frames",
+          "max_output_frames",
+          "qualification"
+        ],
+        "description": "Immutable qualified profile; unadvertised settings cannot be chosen by clients. Exactness is limited to qualified inputs/environment. Different profiles are not assumed mutually equivalent."
+      },
+      "ModelRevision": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "checkpoint_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "foundation_bundle_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "runtime_commit": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          }
+        },
+        "required": [
+          "revision",
+          "name",
+          "checkpoint_sha256",
+          "foundation_bundle_sha256",
+          "runtime_commit"
+        ]
+      },
+      "Limits": {
+        "type": "object",
+        "properties": {
+          "max_active_gpu_jobs": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_pending_jobs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_active_jobs_per_user": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_pending_jobs_per_user": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_asset_bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "user_storage_quota_bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_patch_bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_validation_jobs": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_queue_age_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_run_seconds": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "max_active_gpu_jobs",
+          "max_pending_jobs",
+          "max_active_jobs_per_user",
+          "max_pending_jobs_per_user",
+          "max_asset_bytes",
+          "user_storage_quota_bytes",
+          "max_patch_bytes",
+          "max_validation_jobs",
+          "max_queue_age_seconds",
+          "max_run_seconds"
+        ],
+        "description": "Deployment policy, not a benchmark capacity guarantee. Input limits also apply to each advertised profile."
+      },
+      "Retention": {
+        "type": "object",
+        "properties": {
+          "incomplete_upload_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "ready_asset_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "result_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "idempotency_seconds": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "incomplete_upload_seconds",
+          "ready_asset_seconds",
+          "result_seconds",
+          "idempotency_seconds"
+        ],
+        "description": "TTL clocks are defined in the architecture; accepted jobs pin input bytes. Polling does not extend retention."
+      },
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "api_versions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "api_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "capabilities_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelRevision"
+            }
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Profile"
+            }
+          },
+          "input_formats": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "output_formats": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "features": {
+            "type": "object",
+            "properties": {
+              "hints": {
+                "type": "boolean"
+              },
+              "vfr": {
+                "type": "boolean"
+              },
+              "trimmed_context": {
+                "type": "boolean"
+              },
+              "scaled_preview": {
+                "type": "boolean"
+              },
+              "premultiplied_output": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "hints",
+              "vfr",
+              "trimmed_context",
+              "scaled_preview",
+              "premultiplied_output"
+            ]
+          },
+          "limits": {
+            "$ref": "#/components/schemas/Limits"
+          },
+          "retention": {
+            "$ref": "#/components/schemas/Retention"
+          },
+          "transfer": {
+            "type": "object",
+            "properties": {
+              "tus_version": {
+                "const": "1.0.0"
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "expiration",
+                    "termination"
+                  ]
+                }
+              },
+              "checksum": {
+                "const": "sha256_whole_file"
+              },
+              "download_ranges": {
+                "const": true
+              }
+            },
+            "required": [
+              "tus_version",
+              "extensions",
+              "checksum",
+              "download_ranges"
+            ]
+          },
+          "service_policy": {
+            "type": "object",
+            "properties": {
+              "access": {
+                "const": "free"
+              },
+              "sponsor_processing_benefits": {
+                "const": false
+              }
+            },
+            "required": [
+              "access",
+              "sponsor_processing_benefits"
+            ]
+          }
+        },
+        "required": [
+          "api_versions",
+          "api_revision",
+          "capabilities_revision",
+          "models",
+          "profiles",
+          "input_formats",
+          "output_formats",
+          "features",
+          "limits",
+          "retention",
+          "transfer",
+          "service_policy"
+        ],
+        "description": "Advertise only implemented/qualified paths. Media and job contract version is distinct from model/runtime revision and worker capacity."
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "detail": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "retryable",
+          "request_id"
+        ],
+        "description": "RFC 9457 problem details; sanitize detail. Job failures can carry this same structured record."
+      }
+    }
+  }
+}

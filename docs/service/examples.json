@@ -1,0 +1,205 @@
+{
+  "note": "Fictional payloads and hashes illustrating the proposed contract, not measured output or a deployed service. The two-frame asset keeps this example short; the milestone tests 72 frames.",
+  "asset_create": {
+    "kind": "image_sequence",
+    "width": 1280,
+    "height": 720,
+    "frame_count": 2,
+    "timing": {
+      "mode": "cfr",
+      "frame_rate": {
+        "num": 24,
+        "den": 1
+      },
+      "time_base": {
+        "num": 1,
+        "den": 24000
+      },
+      "start_pts": "48000",
+      "frame_duration_ticks": "1000"
+    },
+    "colour": {
+      "primaries": "bt709",
+      "white_point": "D65",
+      "transfer": "srgb",
+      "matrix": "rgb",
+      "range": "full",
+      "pixel_type": "uint8",
+      "alpha": "none",
+      "transform_id": "identity-srgb-v1"
+    },
+    "geometry": {
+      "pixel_aspect": {
+        "num": 1,
+        "den": 1
+      },
+      "scan": "progressive",
+      "rotation_degrees": 0
+    },
+    "files": [
+      {
+        "frame_index": 0,
+        "bytes": 1000000,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "media_type": "image/png"
+      },
+      {
+        "frame_index": 1,
+        "bytes": 1000000,
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "media_type": "image/png"
+      }
+    ]
+  },
+  "job_create": {
+    "asset_id": "asset_example",
+    "capabilities_revision": "example-v1",
+    "model_revision": "ck2-example",
+    "profile_id": "native-720p-24x12-example",
+    "purpose": "full",
+    "output_range": {
+      "start": 0,
+      "end": 2
+    },
+    "context": {
+      "mode": "entire_asset"
+    },
+    "output": {
+      "format": "exr_sequence",
+      "pixel_type": "float32",
+      "compression": "zip",
+      "channels": [
+        "alpha",
+        "fg"
+      ],
+      "colour_space": "linear_srgb",
+      "foreground_alpha": "straight"
+    }
+  },
+  "result": {
+    "schema_version": "v1",
+    "job_id": "job_example",
+    "result_fingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "recipe": {
+      "model_revision": "ck2-example",
+      "profile_id": "native-720p-24x12-example",
+      "execution_fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "asset_content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "processed_range": {
+        "start": 0,
+        "end": 2
+      },
+      "output_range": {
+        "start": 0,
+        "end": 2
+      },
+      "output": {
+        "format": "exr_sequence",
+        "pixel_type": "float32",
+        "compression": "zip",
+        "channels": [
+          "alpha",
+          "fg"
+        ],
+        "colour_space": "linear_srgb",
+        "foreground_alpha": "straight"
+      }
+    },
+    "timing": {
+      "mode": "cfr",
+      "frame_rate": {
+        "num": 24,
+        "den": 1
+      },
+      "time_base": {
+        "num": 1,
+        "den": 24000
+      },
+      "start_pts": "48000",
+      "frame_duration_ticks": "1000"
+    },
+    "expires_at": "2030-01-02T12:00:00Z",
+    "files": [
+      {
+        "id": "file_0_alpha",
+        "source_frame": 0,
+        "pts": "48000",
+        "duration_ticks": "1000",
+        "output": "alpha",
+        "channels": [
+          "A"
+        ],
+        "width": 1280,
+        "height": 720,
+        "pixel_type": "float32",
+        "colour_space": "coverage",
+        "alpha_association": "coverage",
+        "bytes": 1000000,
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "download_url": "/v1/jobs/job_example/files/file_0_alpha",
+        "expires_at": "2030-01-02T12:00:00Z"
+      },
+      {
+        "id": "file_0_fg",
+        "source_frame": 0,
+        "pts": "48000",
+        "duration_ticks": "1000",
+        "output": "fg",
+        "channels": [
+          "R",
+          "G",
+          "B"
+        ],
+        "width": 1280,
+        "height": 720,
+        "pixel_type": "float32",
+        "colour_space": "linear_srgb",
+        "alpha_association": "straight",
+        "bytes": 1000000,
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "download_url": "/v1/jobs/job_example/files/file_0_fg",
+        "expires_at": "2030-01-02T12:00:00Z"
+      },
+      {
+        "id": "file_1_alpha",
+        "source_frame": 1,
+        "pts": "49000",
+        "duration_ticks": "1000",
+        "output": "alpha",
+        "channels": [
+          "A"
+        ],
+        "width": 1280,
+        "height": 720,
+        "pixel_type": "float32",
+        "colour_space": "coverage",
+        "alpha_association": "coverage",
+        "bytes": 1000000,
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "download_url": "/v1/jobs/job_example/files/file_1_alpha",
+        "expires_at": "2030-01-02T12:00:00Z"
+      },
+      {
+        "id": "file_1_fg",
+        "source_frame": 1,
+        "pts": "49000",
+        "duration_ticks": "1000",
+        "output": "fg",
+        "channels": [
+          "R",
+          "G",
+          "B"
+        ],
+        "width": 1280,
+        "height": 720,
+        "pixel_type": "float32",
+        "colour_space": "linear_srgb",
+        "alpha_association": "straight",
+        "bytes": 1000000,
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "download_url": "/v1/jobs/job_example/files/file_1_fg",
+        "expires_at": "2030-01-02T12:00:00Z"
+      }
+    ]
+  }
+}
