@@ -174,7 +174,7 @@ class BenchmarkClientTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);(root/'000000.png').write_bytes(media)
             fixture={'id':'transport-test','frame_dir':str(root),'asset_request':{'frame_count':1,'width':1,'height':1,'timing':timing,
-                'files':[{'frame_index':0,'bytes':len(media),'sha256':hashlib.sha256(media).hexdigest()}]}}
+                'files':[{'frame_index':0,'bytes':len(media),'sha256':hashlib.sha256(media).hexdigest(),'media_type':'image/png'}]}}
             path=root/'fixture.json';path.write_text(json.dumps(fixture))
             first=module.run_job(self.client,path,'p',root/'run')
             self.assertEqual(first['result_files'],2)

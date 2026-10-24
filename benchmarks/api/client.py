@@ -26,6 +26,41 @@ def digest(path):
     return h.hexdigest()
 
 
+def fixture_file(fixture,file):
+    suffix={'image/png':'.png','image/x-exr':'.exr'}[file['media_type']]
+    return Path(fixture['frame_dir'])/f'{file["frame_index"]:06d}{suffix}'
+
+
+def guidance_inputs(path):
+    if path is None:return {},{}
+    path=Path(path);value=json.loads(path.read_text())
+    if set(value)-{'hint','carry','masks'}:raise ValueError('Unknown guidance field')
+    request,fixtures={},{}
+    if 'carry' in value:request['carry']=value['carry']
+    for key,binding in [('hint',value.get('hint')),*[(f'mask-{i}',m) for i,m in enumerate(value.get('masks',[]))]]:
+        if binding is None:continue
+        binding=dict(binding);reference=Path(binding.pop('fixture'))
+        if not reference.is_absolute():reference=path.parent/reference
+        fixtures[key]=json.loads(reference.read_text())
+        if key=='hint':request['hint']=binding
+        else:request.setdefault('masks',[]).append(binding)
+    return request,fixtures
+
+
+def expected_guidance(request,assets):
+    carry=dict(enabled=True,confidence=.95,precedence='provided');carry.update(request.get('carry',{}))
+    value=dict(hint=None,carry=carry,masks=[])
+    if 'hint' in request:
+        h=request['hint'];a=assets['hint'];quality={f['frame_index']:h.get('confidence',.95) for f in a['manifest']['files']}
+        quality.update({f['frame_index']:f['confidence'] for f in h.get('frame_confidence',[])})
+        value['hint']=dict(content_sha256=a['content_sha256'],mode=h['mode'],confidence=float(h.get('confidence',.95)),
+            frames=[dict(frame_index=i,confidence=float(quality[i])) for i in sorted(quality)])
+    for i,m in enumerate(request.get('masks',[])):
+        value['masks'].append(dict(content_sha256=assets[f'mask-{i}']['content_sha256'],role=m['role'],mode=m['mode']))
+    value['masks'].sort(key=lambda m:(m['role'],m['content_sha256'],m['mode']))
+    return value
+
+
 def save(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -251,7 +286,7 @@ def poll(client, operation, path, wanted, timeout):
 
 
 def run_job(client, fixture_path, profile_id, out, resume=False, timeout=600,
-            purpose='full', frame_range=None, route_label='unspecified'):
+            purpose='full', frame_range=None, route_label='unspecified',guidance_path=None,allow_testing_profile=False):
     started = time.perf_counter()
     record_start = len(client.records)
     out = Path(out)
@@ -269,6 +304,7 @@ def run_job(client, fixture_path, profile_id, out, resume=False, timeout=600,
         last = now
     try:
         fixture = json.loads(Path(fixture_path).read_text())
+        controls,guidance_fixtures=guidance_inputs(guidance_path)
         report['fixture'] = fixture['id']
         asset_spec = fixture['asset_request']
         selected = frame_range or {'start':0,'end':asset_spec['frame_count']}
@@ -276,11 +312,13 @@ def run_job(client, fixture_path, profile_id, out, resume=False, timeout=600,
             raise ValueError('Output range is outside the fixture')
         delivery = dict(purpose=purpose,output_range=selected)
         report['delivery'] = delivery
-        for f in asset_spec['files']:
-            path = Path(fixture['frame_dir']) / f'{f["frame_index"]:06d}.png'
-            if path.stat().st_size != f['bytes'] or digest(path) != f['sha256']:
-                raise ApiError('Local fixture changed')
+        for item in [fixture,*guidance_fixtures.values()]:
+            for f in item['asset_request']['files']:
+                path=fixture_file(item,f)
+                if path.stat().st_size != f['bytes'] or digest(path) != f['sha256']:
+                    raise ApiError('Local fixture changed')
         signature = hashlib.sha256(json.dumps(asset_spec,sort_keys=True).encode()).hexdigest()
+        guidance_signature=hashlib.sha256(json.dumps(dict(controls=controls,assets={k:f['asset_request'] for k,f in guidance_fixtures.items()}),sort_keys=True).encode()).hexdigest() if guidance_path else None
         state_path = out/'state.json'
         if state_path.exists():
             if not resume:
@@ -290,8 +328,10 @@ def run_job(client, fixture_path, profile_id, out, resume=False, timeout=600,
                 raise ApiError('Resume state belongs to another input/origin/profile')
             if state['delivery'] != delivery:
                 raise ApiError('Resume state belongs to another preview/full range')
+            if state.get('guidance_signature')!=guidance_signature:raise ApiError('Guidance changed; use a new job/cache directory')
         else:
             state = dict(input_signature=signature,origin=client.origin,profile_id=profile_id,delivery=delivery,
+                         guidance_signature=guidance_signature,guidance_assets={},
                          keys={n:str(uuid.uuid4()) for n in ('asset','complete','job')})
             save(state_path,state)
         stage('local_input_verification')
@@ -300,6 +340,8 @@ def run_job(client, fixture_path, profile_id, out, resume=False, timeout=600,
         if len(profiles) != 1:
             raise ApiError('Requested profile is not advertised')
         profile = profiles[0]
+        if profile.get('qualification',{}).get('state','qualified')!='qualified' and not allow_testing_profile:
+            raise ApiError('Profile is under qualification; normal processing is disabled')
         if 'asset_id' not in state:
             asset, _ = client.json('asset_create','POST','/v1/assets',asset_spec,state['keys']['asset'],(200,201))
             state['asset_id'] = asset['id']
@@ -310,18 +352,36 @@ def run_job(client, fixture_path, profile_id, out, resume=False, timeout=600,
         if asset['state'] == 'uploading':
             slots = {f['frame_index']:f for f in asset['files']}
             for f in asset_spec['files']:
-                client.upload(slots[f['frame_index']],Path(fixture['frame_dir']) / f'{f["frame_index"]:06d}.png')
+                client.upload(slots[f['frame_index']],fixture_file(fixture,f))
         stage('upload')
         asset_url = '/v1/assets/' + state['asset_id']
         client.json('asset_complete','POST',asset_url+'/complete',{},state['keys']['complete'],(200,202))
         ready_asset = poll(client,'asset_poll',asset_url,{'ready'},timeout)
         stage('asset_validation_wait')
+        ready_guidance={}
+        for name,item in guidance_fixtures.items():
+            slot=state.setdefault('guidance_assets',{}).setdefault(name,dict(asset_key=str(uuid.uuid4()),complete_key=str(uuid.uuid4())))
+            save(state_path,state)
+            if 'id' not in slot:
+                a,_=client.json('guidance_create','POST','/v1/assets',item['asset_request'],slot['asset_key'],(200,201))
+                slot['id']=a['id'];save(state_path,state)
+            else:a,_=client.json('guidance_get','GET','/v1/assets/'+slot['id'])
+            if a['state']=='uploading':
+                files={f['frame_index']:f for f in item['asset_request']['files']}
+                for upload in a['files']:client.upload(upload,fixture_file(item,files[upload['frame_index']]))
+            url='/v1/assets/'+slot['id']
+            client.json('guidance_complete','POST',url+'/complete',{},slot['complete_key'],(200,202))
+            ready_guidance[name]=poll(client,'guidance_poll',url,{'ready'},timeout)
+        if guidance_path:stage('guidance_upload_and_validation')
         if 'job_request' not in state:
             state['job_request'] = dict(asset_id=state['asset_id'], capabilities_revision=cap['capabilities_revision'],
                 model_revision=profile['model_revision'],profile_id=profile_id,purpose=purpose,
                 output_range=selected, context={'mode':'entire_asset'},
                 output=dict(format='exr_sequence',pixel_type='float32',compression='zip',channels=['alpha','fg'],
                             colour_space='linear_srgb',foreground_alpha='straight'))
+            state['job_request'].update(controls)
+            if 'hint' in controls:state['job_request']['hint']=dict(controls['hint'],asset_id=ready_guidance['hint']['id'])
+            if 'masks' in controls:state['job_request']['masks']=[dict(m,asset_id=ready_guidance[f'mask-{i}']['id']) for i,m in enumerate(controls['masks'])]
             save(state_path,state)
         job, _ = client.json('job_submit','POST','/v1/jobs',state['job_request'],state['keys']['job'],(200,202))
         if state.get('job_id', job['id']) != job['id']:
@@ -335,6 +395,12 @@ def run_job(client, fixture_path, profile_id, out, resume=False, timeout=600,
         stage('queue_processing_and_poll_detection')
         result, _ = client.json('result_manifest','GET',job_url+'/result')
         recipe = result['recipe']
+        if 'processing_fingerprint' in recipe:
+            payload={k:v for k,v in recipe.items() if k!='processing_fingerprint'}
+            computed=hashlib.sha256(json.dumps(payload,sort_keys=True,separators=(',',':'),allow_nan=False).encode()).hexdigest()
+            if computed!=recipe['processing_fingerprint'] or recipe.get('guidance')!=expected_guidance(controls,ready_guidance):
+                raise ApiError('Result guidance/cache fingerprint differs from verified inputs')
+        elif guidance_path:raise ApiError('Guided jobs require a complete processing fingerprint')
         if (result['job_id'] != job['id'] or recipe['profile_id'] != profile_id
                 or recipe['model_revision'] != state['job_request']['model_revision']
                 or recipe['execution_fingerprint'] != profile['execution_fingerprint']
@@ -366,7 +432,7 @@ def run_job(client, fixture_path, profile_id, out, resume=False, timeout=600,
             path = cache/f'{f["source_frame"]:06d}_{f["output"]}.exr'
             cached += client.download(f,path)
             paths.append(dict(path=str(path.resolve()),sha256=f['sha256'],bytes=f['bytes']))
-        save(cache/'manifest.json',dict(result=result,local_files=paths))
+        save(cache/'manifest.json',dict(result=result,local_files=paths,cache_key=recipe.get('processing_fingerprint')))
         report['cache_hits'] = cached
         report['result_files'] = len(paths)
         stage('result_manifest_download_and_local_verification')
@@ -398,6 +464,8 @@ def main():
     run.add_argument('--resume',action='store_true')
     run.add_argument('--purpose',choices=('preview','full'),default='full')
     run.add_argument('--frames',help='Output presentation range START:END; full fixture remains the context.')
+    run.add_argument('--guidance',type=Path,help='Local guidance JSON referencing matte fixtures, confidence, carry and constraints.')
+    run.add_argument('--allow-testing-profile',action='store_true',help='Explicit private qualification only; not normal processing.')
     args = ap.parse_args()
     if args.token_file.stat().st_mode & 0o077:
         ap.error('Token file permissions must be 0600 or stricter')
@@ -424,7 +492,8 @@ def main():
                 start,end = map(int,args.frames.split(':'))
                 selected = {'start':start,'end':end}
             report = run_job(client,args.fixture,args.profile_id,args.output,args.resume,
-                             purpose=args.purpose,frame_range=selected,route_label=args.route_label)
+                             purpose=args.purpose,frame_range=selected,route_label=args.route_label,
+                             guidance_path=args.guidance,allow_testing_profile=args.allow_testing_profile)
             print(json.dumps({k:v for k,v in report.items() if k not in ('requests','request_summary')},indent=2))
     finally:
         client.close()

@@ -49,7 +49,7 @@ after a crash. Serialize writes per upload, bound chunk sizes, and authenticate
 HEAD/PATCH/DELETE as well as creation.
 
 `complete` verifies declared size and whole-file SHA-256, actual encoding/dimensions,
-contiguous unique frame indices, consistent media metadata and decoded limits.
+unique frame indices, complete RGB sequences, consistent media metadata and decoded limits.
 Only `ready` assets may enter the GPU queue. Completed files are immutable. An
 invalid checksum/media asset must be deleted and recreated. `complete` freezes
 all file slots and excludes concurrent PATCH; its state transition is atomic.
@@ -60,8 +60,10 @@ caller filename controls ordering or paths. Timestamps use rational CFR plus
 start PTS and integer tick duration; server-side semantic validation checks
 `time_base × frame_duration_ticks = frame_rate.den / frame_rate.num`.
 Use integer strings for potentially 64-bit timestamps so JavaScript clients do
-not round them. No float-based seeking. M1 accepts only progressive square-pixel
-unrotated RGB8 sRGB PNG sequences with no alpha.
+not round them. No float-based seeking. Inputs must be progressive, square-pixel
+and unrotated. Enabled plates are RGB8 sRGB PNG or linear RGB half/float EXR, with
+no input alpha. Coverage assets can be sparse. See [editor inputs](editor-inputs.md)
+for exact formats, alignment, confidence, carry and mask precedence.
 
 ## Jobs, progress and failure recovery
 

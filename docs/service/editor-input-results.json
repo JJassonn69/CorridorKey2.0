@@ -1,0 +1,301 @@
+{
+  "date": "2026-10-24",
+  "execution_fingerprint": "25af457288e88a8ae978f6976f98de33184016d460470fcc18db4e37519e2f2d",
+  "runtime_source_sha256": "f36ffaf58d6b474c528488f206657db72ea32a99767ec2d8f168eb285bcca7f6",
+  "gpu_class": "NVIDIA RTX A5000",
+  "driver_version": "580.126.09",
+  "checkpoint_sha256": "c43596de98cc8866d577c8a9f9ea239acdf3f7a130ff24e25db4375a50590436",
+  "baseline": {
+    "passed": true,
+    "frames": 602,
+    "exact_files": 1806,
+    "cases": [
+      {
+        "case": "short",
+        "frames": 8,
+        "exact_files": 24
+      },
+      {
+        "case": "tail",
+        "frames": 49,
+        "exact_files": 147
+      },
+      {
+        "case": "720p",
+        "frames": 72,
+        "exact_files": 216
+      },
+      {
+        "case": "1080p",
+        "frames": 72,
+        "exact_files": 216
+      },
+      {
+        "case": "hair",
+        "frames": 72,
+        "exact_files": 216
+      },
+      {
+        "case": "motion",
+        "frames": 48,
+        "exact_files": 144
+      },
+      {
+        "case": "godiva",
+        "frames": 160,
+        "exact_files": 480
+      },
+      {
+        "case": "low-vram",
+        "frames": 8,
+        "exact_files": 24
+      },
+      {
+        "case": "low-vram-tail",
+        "frames": 49,
+        "exact_files": 147
+      },
+      {
+        "case": "linear-exr",
+        "frames": 16,
+        "exact_files": 48
+      },
+      {
+        "case": "sequence-hint",
+        "frames": 48,
+        "exact_files": 144
+      }
+    ]
+  },
+  "feature_groups": {
+    "one_worker": {
+      "cases": [
+        {
+          "direct_runtime": "previously accepted runtime",
+          "exr_files": 72,
+          "independent_mask_oracle": true,
+          "name": "first",
+          "passed": true,
+          "peak_allocated_bytes": 3282430976,
+          "peak_reserved_bytes": 3848273920,
+          "processing_fingerprint": "be43ede96aeaf59ca84e5dcc72c16bd1fb1bf2cf2fba89b79361b4bd61916bcd",
+          "raw_frames": 36
+        },
+        {
+          "direct_runtime": "previously accepted runtime",
+          "exr_files": 72,
+          "independent_mask_oracle": true,
+          "name": "dense-carried",
+          "passed": true,
+          "peak_allocated_bytes": 3282430976,
+          "peak_reserved_bytes": 3848273920,
+          "processing_fingerprint": "6e946f5866af68835667a82145f3be5c265803f38f4bc2a8dbfbc736e0e1a470",
+          "raw_frames": 36
+        },
+        {
+          "direct_runtime": "extended direct runtime",
+          "exr_files": 72,
+          "independent_mask_oracle": true,
+          "name": "dense-provided",
+          "passed": true,
+          "peak_allocated_bytes": 3282430976,
+          "peak_reserved_bytes": 3848273920,
+          "processing_fingerprint": "002836eaa9ca5572f69f1c19c0dc293ff8baf1b13388cfaa7f75ccb0e363d700",
+          "raw_frames": 36
+        },
+        {
+          "direct_runtime": "extended direct runtime",
+          "exr_files": 72,
+          "independent_mask_oracle": true,
+          "name": "sparse",
+          "passed": true,
+          "peak_allocated_bytes": 3282430976,
+          "peak_reserved_bytes": 3848273920,
+          "processing_fingerprint": "e9d9b5466de5b0801bf4019cb038c1b8f00b1ec93277ffcf3102dcb871dcd9b2",
+          "raw_frames": 36
+        },
+        {
+          "direct_runtime": "extended direct runtime",
+          "exr_files": 72,
+          "independent_mask_oracle": true,
+          "name": "sparse-no-carry",
+          "passed": true,
+          "peak_allocated_bytes": 3282430976,
+          "peak_reserved_bytes": 3848273920,
+          "processing_fingerprint": "c7feebcab1d571c12b7d1f8f5bbd56c90755c60bade15bec955aa39cb56bdc54",
+          "raw_frames": 36
+        },
+        {
+          "direct_runtime": "previously accepted runtime",
+          "exr_files": 72,
+          "independent_mask_oracle": true,
+          "name": "constraints",
+          "passed": true,
+          "peak_allocated_bytes": 3282430976,
+          "peak_reserved_bytes": 3848273920,
+          "processing_fingerprint": "30084b9e9f0b756d3baf29ee989ecf0da4c4155dc7378ad05c7f07300d428331",
+          "raw_frames": 36
+        },
+        {
+          "direct_runtime": "extended direct runtime",
+          "exr_files": 72,
+          "independent_mask_oracle": true,
+          "name": "linear",
+          "passed": true,
+          "peak_allocated_bytes": 3282430976,
+          "peak_reserved_bytes": 3848273920,
+          "processing_fingerprint": "ca5fa4310503a3458c7c8c3908132db985e7efa295014e0a2d3de577e1e13ab6",
+          "raw_frames": 36
+        },
+        {
+          "direct_runtime": "previously accepted runtime",
+          "exr_files": 16,
+          "independent_mask_oracle": true,
+          "name": "half",
+          "passed": true,
+          "peak_allocated_bytes": 2550059520,
+          "peak_reserved_bytes": 2673868800,
+          "processing_fingerprint": "7768ab569659199f0677dd1ce161cb8fc1f665a8b82366587acd8ba7b6bac2be",
+          "raw_frames": 8
+        }
+      ],
+      "exr_files": 520,
+      "passed": true,
+      "raw_frames": 260
+    },
+    "large_profile": {
+      "cases": [
+        {
+          "direct_runtime": "previously accepted runtime",
+          "exr_files": 288,
+          "independent_mask_oracle": true,
+          "name": "large",
+          "passed": true,
+          "peak_allocated_bytes": 7735220224,
+          "peak_reserved_bytes": 9300869120,
+          "processing_fingerprint": "a7ab5890c5c9e588ce196475217c913c484ba3f0a3c0384a8a9dbdbffc1b7b28",
+          "raw_frames": 144
+        }
+      ],
+      "exr_files": 288,
+      "passed": true,
+      "raw_frames": 144
+    },
+    "concurrent_workers": {
+      "cases": [
+        {
+          "exr_files": 72,
+          "name": "sparse",
+          "passed": true,
+          "peak_allocated_bytes": 3279760384,
+          "peak_reserved_bytes": 3600809984,
+          "raw_frames": 36
+        },
+        {
+          "exr_files": 72,
+          "name": "linear",
+          "passed": true,
+          "peak_allocated_bytes": 3282430976,
+          "peak_reserved_bytes": 3850371072,
+          "raw_frames": 36
+        }
+      ],
+      "exr_files": 144,
+      "passed": true,
+      "raw_frames": 72
+    },
+    "reuse_after_large": {
+      "cases": [
+        {
+          "exr_files": 72,
+          "name": "first",
+          "passed": true,
+          "peak_allocated_bytes": 3279760384,
+          "peak_reserved_bytes": 3600809984,
+          "raw_frames": 36
+        }
+      ],
+      "exr_files": 72,
+      "passed": true,
+      "raw_frames": 36
+    }
+  },
+  "raw_feature_frames": 512,
+  "feature_exr_files": 1024,
+  "capacity": {
+    "cases": [
+      {
+        "load_average_1m_range": [
+          5.24658203125,
+          7.1611328125
+        ],
+        "max_temperature_c": 78,
+        "name": "one-worker",
+        "sampled_peak_device_mib": 4292,
+        "samples": 159,
+        "thermal_slowdown_samples": 0,
+        "worker_peak_allocated_bytes": 3282430976,
+        "worker_peak_reserved_bytes": 3848273920
+      },
+      {
+        "load_average_1m_range": [
+          7.4833984375,
+          11.0478515625
+        ],
+        "max_temperature_c": 74,
+        "name": "two-workers",
+        "sampled_peak_device_mib": 6817,
+        "samples": 53,
+        "thermal_slowdown_samples": 0,
+        "worker_peak_allocated_bytes": 3282430976,
+        "worker_peak_reserved_bytes": 3850371072
+      },
+      {
+        "load_average_1m_range": [
+          7.16845703125,
+          11.32568359375
+        ],
+        "max_temperature_c": 88,
+        "name": "large-profile",
+        "sampled_peak_device_mib": 11117,
+        "samples": 196,
+        "thermal_slowdown_samples": 28,
+        "worker_peak_allocated_bytes": 7735220224,
+        "worker_peak_reserved_bytes": 9300869120
+      }
+    ],
+    "sample_interval_seconds": 1,
+    "scope": "API service only; includes idle resident worker and desktop GPU use; excludes independent direct runs"
+  },
+  "exclusivity": {
+    "passed": true,
+    "small_queue_seconds": 205.12238404154778
+  },
+  "contract_tests": {
+    "mac_passed": 21,
+    "server_passed": 21,
+    "hint_tensor_tests_passed": 2
+  },
+  "cache_checks": {
+    "changed_guidance_rejected_before_http": true,
+    "identical_job_reused": true,
+    "local_cache_hits": 72
+  },
+  "limitations": [
+    "Private personal-use footage; no training or redistribution.",
+    "Correctness and capacity qualification; shared CPU load and thermal slowdown preclude speed claims.",
+    "Device memory sampled approximately once a second; not a hard bound.",
+    "No ground-truth quality score. New guided modes match direct inference with the same inputs/settings.",
+    "1080p capacity tested with RGB8, a first-frame matte and 144-frame context. HDR paths tested at 1024x578."
+  ],
+  "deployed_smoke": {
+    "passed": true,
+    "workers": 1,
+    "capture_raw": false,
+    "qualified_profiles_only": true,
+    "exr_files": 72,
+    "exact_reference_match": true,
+    "same_processing_fingerprint": true,
+    "schema_valid": true
+  }
+}

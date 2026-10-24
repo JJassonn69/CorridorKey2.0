@@ -1,8 +1,8 @@
 # Run the private API pilot
 
 The pilot serves the v1 contract on `127.0.0.1:18080`. Connect through SSH from
-the client. It wraps the accepted inference implementation without changing
-its neural network or rendering code. Results and credentials stay private.
+the client. It wraps the accepted inference implementation and its qualified
+guidance extension. Results and credentials stay private.
 
 ## Prepare the server
 
@@ -28,7 +28,7 @@ default and only their SHA-256 digests are stored in SQLite. Revoke a token loca
 with `.venv/bin/python -m service.admin revoke --data /absolute/private-data --token-file /private/token`.
 
 `init` fingerprints runtime sources, checkpoint, all foundation assets, execution
-stack, worker wrapper, and fixed profile. It changes configuration, not running
+stack, worker/media/recipe sources, and fixed profile. It changes configuration, not running
 workers. Stop/restart the managed service to change one versus two workers.
 Never start an independent CUDA pool against the same data directory.
 Provisioning rejects a different execution fingerprint, GPU class or driver from
@@ -59,21 +59,26 @@ Playback can use those local files without a server connection.
 
 | Concern | Pilot behavior |
 |---|---|
-| Input | Contiguous RGB8 PNG sequence, sRGB/BT.709, progressive square pixels, no alpha |
-| Size | Up to 72 frames, 1280×720; the measured footage is 1024×578 |
+| Input | RGB8 sRGB PNG or linear RGB half/float EXR, BT.709/D65, progressive square pixels, no alpha |
+| Size | 720p: 1280×720 / 72 frames; 1080p: 1920×1080 / 144 frames |
+| Guidance | First-frame, dense or sparse coverage mattes; confidence/carry controls; independent constraints |
 | Profile | Hann 24/12, Stage 2 batch 1, native scale, seed 0, normal memory mode |
 | Output | Float32 ZIP EXR, separate straight linear foreground and coverage matte |
-| Alpha channel | Native single EXR channel `Y`, interpreted as coverage; no file rewrite |
+| Alpha channel | Single EXR channel `Y`, interpreted as coverage; optional constraints apply before publication |
 | Preview | Process all uploaded context, deliver the requested frame range |
-| Workers | Independent persistent model copies; one active job per worker and per user |
+| Workers | Independent persistent models; default one, at most two; 1080p jobs require exclusive GPU execution |
 | Queue | Eight pending globally, two pending per user, round-robin users/FIFO per user |
 | Transfer | Durable offsets, whole-file SHA-256, frozen validation, authenticated byte ranges/ETags |
 | Cancellation | Queued jobs cancel immediately; running jobs cannot publish after cancellation and are killed/reaped after up to 10 s grace; the model reloads |
 | Recovery | Unknown worker/CUDA failures recycle the process; controller restart fails interrupted attempts |
-| Storage | 1 GiB input asset, 4 GiB user reservation, 10 GiB server disk floor |
+| Storage | 4 GiB input asset, 64 MiB per file, 16 GiB user reservation, 10 GiB server disk floor |
 | Expiry | Uploads 24 h from creation; ready inputs 24 h from validation; results 24 h from completion; accepted jobs pin inputs |
-| Deadlines | 600 s queue age and 600 s execution; explicit retry creates a new job |
+| Deadlines | 600 s queue age and 1800 s execution; explicit retry creates a new job |
 | Access | Expiring owner tokens; cross-user resource IDs return 404; sponsorship changes no processing policy |
+
+See [editor inputs](editor-inputs.md) for EXR restrictions, frame mapping, mask
+precedence, CLI guidance and cache identity, and [qualification](editor-input-results.md)
+for the enabled profiles.
 
 Every job uses a fresh configuration and private scratch directory. Each job has
 the direct benchmark's eight-frame warmup; its cost is included in API service
@@ -103,7 +108,7 @@ the controller/HTTP tests; the real test does not wait 24 hours for retention.
 ## Deployment boundary
 
 This is a private loopback pilot using a bounded Python HTTP server, SQLite WAL,
-one PNG validator thread and spawned CUDA processes. It has no public ingress,
+one bounded media validator thread and spawned CUDA processes. It has no public ingress,
 editor plugin, account signup, billing, arbitrary codec upload or distributed
 queue. A public deployment still needs hardened HTTPS ingress/request-rate policy
 and a separate restricted decoder process. Do not expose the pilot port publicly.

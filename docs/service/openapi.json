@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "CorridorKey shared inference API",
-    "version": "0.1.0-pilot",
-    "description": "Private single-host pilot. HTTP/media contract is independent of the unchanged PyTorch inference implementation. See pilot.md for deployment limits and measured results."
+    "version": "0.2.0-pilot",
+    "description": "Private single-host pilot. HTTP/media contract is independent of the qualified PyTorch worker. See editor-inputs.md for guidance, EXR media and cache identity; pilot.md for deployment."
   },
   "servers": [
     {
@@ -1085,7 +1085,10 @@
             "const": "D65"
           },
           "transfer": {
-            "const": "srgb"
+            "enum": [
+              "srgb",
+              "linear"
+            ]
           },
           "matrix": {
             "const": "rgb"
@@ -1094,7 +1097,11 @@
             "const": "full"
           },
           "pixel_type": {
-            "const": "uint8"
+            "enum": [
+              "uint8",
+              "float16",
+              "float32"
+            ]
           },
           "alpha": {
             "const": "none"
@@ -1115,8 +1122,36 @@
           "alpha",
           "transform_id"
         ],
-        "description": "M1 canonical RGB PNG input; transform_id identifies adapter colour conversion, or identity-srgb-v1.",
-        "additionalProperties": false
+        "description": "Canonical sRGB RGB8 PNG or scene-linear sRGB/BT.709 RGB half/float EXR, no input alpha.",
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "transfer": {
+                  "const": "srgb"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "pixel_type": {
+                  "const": "uint8"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "pixel_type": {
+                  "enum": [
+                    "float16",
+                    "float32"
+                  ]
+                }
+              }
+            }
+          }
+        ]
       },
       "Geometry": {
         "type": "object",
@@ -1156,7 +1191,8 @@
         "properties": {
           "frame_index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Absolute presentation index within the declared asset context; sparse only for matte assets."
           },
           "bytes": {
             "type": "integer",
@@ -1167,7 +1203,10 @@
             "$ref": "#/components/schemas/Sha256"
           },
           "media_type": {
-            "const": "image/png"
+            "enum": [
+              "image/png",
+              "image/x-exr"
+            ]
           }
         },
         "required": [
@@ -1182,7 +1221,10 @@
         "type": "object",
         "properties": {
           "kind": {
-            "const": "image_sequence"
+            "enum": [
+              "image_sequence",
+              "matte_sequence"
+            ]
           },
           "width": {
             "type": "integer",
@@ -1200,7 +1242,14 @@
             "$ref": "#/components/schemas/Timing"
           },
           "colour": {
-            "$ref": "#/components/schemas/InputColour"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InputColour"
+              },
+              {
+                "$ref": "#/components/schemas/MatteColour"
+              }
+            ]
           },
           "geometry": {
             "$ref": "#/components/schemas/Geometry"
@@ -1223,8 +1272,33 @@
           "geometry",
           "files"
         ],
-        "description": "Files must contain exactly frame_count unique contiguous indices 0..frame_count-1. Validate advertised byte/pixel/frame limits before reserving storage.",
-        "additionalProperties": false
+        "description": "RGB assets have every frame. Coverage assets may contain unique sparse frame indices within frame_count. All files match declared type and dimensions; values are finite, coverage is [0,1].",
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "matte_sequence"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "colour": {
+                  "$ref": "#/components/schemas/MatteColour"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "colour": {
+                  "$ref": "#/components/schemas/InputColour"
+                }
+              }
+            }
+          }
+        ]
       },
       "UploadSlot": {
         "type": "object",
@@ -1390,6 +1464,19 @@
           },
           "output": {
             "$ref": "#/components/schemas/OutputSpec"
+          },
+          "hint": {
+            "$ref": "#/components/schemas/Hint"
+          },
+          "carry": {
+            "$ref": "#/components/schemas/Carry"
+          },
+          "masks": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "$ref": "#/components/schemas/Mask"
+            }
           }
         },
         "required": [
@@ -1402,7 +1489,7 @@
           "context",
           "output"
         ],
-        "description": "M1 preview and full share the same native-quality execution. Preview changes delivered range only. Reject unavailable revisions/profiles; never silently select another one.",
+        "description": "Immutable source/profile/output recipe with optional owner-scoped coverage guidance. All guidance assets must match source dimensions, context frame_count, geometry and exact CFR timing fields. Sparse hints do not interpolate missing frames. All pixel-affecting values enter processing_fingerprint.",
         "additionalProperties": false
       },
       "Progress": {
@@ -1528,6 +1615,15 @@
           },
           "output": {
             "$ref": "#/components/schemas/OutputSpec"
+          },
+          "guidance": {
+            "$ref": "#/components/schemas/EffectiveGuidance"
+          },
+          "recipe_version": {
+            "const": "editor-v1"
+          },
+          "processing_fingerprint": {
+            "$ref": "#/components/schemas/Sha256"
           }
         },
         "required": [
@@ -1702,7 +1798,7 @@
           "download_url",
           "expires_at"
         ],
-        "description": "Alpha: single stored channel [Y], interpreted as coverage/alpha. Foreground: [R,G,B], linear_srgb, straight. Native EXR channel names are preserved for byte identity."
+        "description": "Alpha: single stored channel [Y], interpreted as coverage/alpha. Foreground: [R,G,B], linear_srgb, straight. Native EXR channel names are preserved for byte identity. The returned alpha includes requested coverage constraints; straight foreground remains the model output."
       },
       "Result": {
         "type": "object",
@@ -1852,7 +1948,10 @@
             ],
             "properties": {
               "state": {
-                "const": "qualified"
+                "enum": [
+                  "testing",
+                  "qualified"
+                ]
               },
               "suite_revision": {
                 "type": "string",
@@ -1868,6 +1967,12 @@
               }
             },
             "description": "Identifies the completed validation matrix behind the advertised profile, not a claim of exactness on arbitrary future hardware."
+          },
+          "max_parallel_jobs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "A profile with value 1 runs alone on the GPU, even with two resident workers."
           }
         },
         "required": [
@@ -1907,7 +2012,11 @@
           },
           "runtime_commit": {
             "type": "string",
-            "pattern": "^[0-9a-f]{40}$"
+            "pattern": "^[0-9a-f]{40}$",
+            "description": "Accepted optimisation base commit. runtime_source_sha256 identifies the deployed source bundle, including qualified extensions."
+          },
+          "runtime_source_sha256": {
+            "$ref": "#/components/schemas/Sha256"
           }
         },
         "required": [
@@ -1958,6 +2067,10 @@
             "minimum": 1
           },
           "max_run_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_file_bytes": {
             "type": "integer",
             "minimum": 1
           }
@@ -2062,6 +2175,24 @@
                 "type": "boolean"
               },
               "premultiplied_output": {
+                "type": "boolean"
+              },
+              "hint_modes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "constraint_roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "linear_exr": {
+                "type": "boolean"
+              },
+              "sparse_keyframes": {
                 "type": "boolean"
               }
             },
@@ -2302,6 +2433,245 @@
             "description": "Private diagnostic on the server boot monotonic clock."
           }
         }
+      },
+      "MatteColour": {
+        "type": "object",
+        "properties": {
+          "interpretation": {
+            "const": "coverage"
+          },
+          "pixel_type": {
+            "enum": [
+              "uint8",
+              "uint16",
+              "float16",
+              "float32"
+            ]
+          }
+        },
+        "required": [
+          "interpretation",
+          "pixel_type"
+        ],
+        "additionalProperties": false
+      },
+      "Hint": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "mode": {
+            "enum": [
+              "first_frame",
+              "sequence",
+              "keyframes"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "frame_confidence": {
+            "type": "array",
+            "maxItems": 144,
+            "items": {
+              "type": "object",
+              "properties": {
+                "frame_index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "frame_index",
+                "confidence"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "asset_id",
+          "mode"
+        ],
+        "additionalProperties": false,
+        "description": "Full-frame coverage observations. first_frame requires index 0; sequence requires every frame; keyframes has no interpolation or implicit black/missing observations. Confidence defaults to .95."
+      },
+      "Carry": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "precedence": {
+            "enum": [
+              "provided",
+              "carried"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "description": "Defaults: enabled true, confidence .95, provided precedence. Provided keyframes always override carry. carried preserves legacy dense-sequence overlap behavior."
+      },
+      "Mask": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "mode": {
+            "enum": [
+              "static",
+              "sequence"
+            ]
+          },
+          "role": {
+            "enum": [
+              "force_background",
+              "force_foreground"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "asset_id",
+          "mode",
+          "role"
+        ],
+        "additionalProperties": false,
+        "description": "Static requires frame 0 and applies to all frames; sequence requires every frame. Labels do not affect pixels. Maximum foreground coverage then minimum with 1-background coverage; exclusion wins. Straight foreground RGB is unchanged."
+      },
+      "EffectiveHint": {
+        "type": "object",
+        "properties": {
+          "content_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "mode": {
+            "enum": [
+              "first_frame",
+              "sequence",
+              "keyframes"
+            ]
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "frames": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "frame_index": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "frame_index",
+                "confidence"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "content_sha256",
+          "mode",
+          "confidence",
+          "frames"
+        ],
+        "additionalProperties": false
+      },
+      "EffectiveMask": {
+        "type": "object",
+        "properties": {
+          "content_sha256": {
+            "$ref": "#/components/schemas/Sha256"
+          },
+          "role": {
+            "enum": [
+              "force_background",
+              "force_foreground"
+            ]
+          },
+          "mode": {
+            "enum": [
+              "static",
+              "sequence"
+            ]
+          }
+        },
+        "required": [
+          "content_sha256",
+          "role",
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "EffectiveGuidance": {
+        "type": "object",
+        "properties": {
+          "hint": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EffectiveHint"
+              }
+            ]
+          },
+          "carry": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Carry"
+              },
+              {
+                "required": [
+                  "enabled",
+                  "confidence",
+                  "precedence"
+                ]
+              }
+            ]
+          },
+          "masks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EffectiveMask"
+            },
+            "maxItems": 4
+          }
+        },
+        "required": [
+          "hint",
+          "carry",
+          "masks"
+        ],
+        "additionalProperties": false
       }
     }
   }

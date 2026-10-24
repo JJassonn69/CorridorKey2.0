@@ -34,7 +34,8 @@ dimensions. Apply the sRGB transfer, clip to [0,1] and round to RGB8 PNG. No ACE
 view/tone-mapping transform is baked in. The SDR derivatives clip out-of-gamut,
 negative and over-range samples; they cannot qualify the original HDR/12-bit path.
 Full values, versions, hashes and clipping counts are retained in each private
-`fixture.json`. Preserve the masters for a separate linear-EXR test later.
+`fixture.json`. The [editor-input qualification](../../docs/service/editor-input-results.md) separately
+tests linear half/float EXR derivatives with negative and HDR values.
 
 Reproduction (the preparation script refuses to overwrite an existing clip):
 
@@ -87,6 +88,10 @@ python benchmarks/api/client.py --base-url http://127.0.0.1:18080 --token-file /
 Resume an interrupted client by adding `--resume` with the identical options and
 output directory. It reconciles uploads with HEAD, retains idempotency keys, resumes
 downloads with ETag/If-Range, checks SHA-256 and rejects changed input/profile/range.
+Optional `--guidance /private/guidance.json` uploads first/dense/sparse mattes and
+independent coverage masks; see [editor inputs](../../docs/service/editor-inputs.md).
+Changed guidance rejects resume; verified recipes include a processing fingerprint.
+
 Output JSON contains request records, operation summaries, stage timings and the
 server's optional timings. The client does not assume an API is healthy or fabricate
 missing queue/GPU timings. Lifecycle/fairness/security checks below require the
@@ -123,3 +128,31 @@ Seven real loopback HTTP transport tests cover preserved idempotency keys across
 origin/redirect checks, sample-count handling and complete workflow/cache resume.
 They use deliberately fake media bytes and no inference model. No test latency is
 reported as deployed-API performance.
+
+## Editor-input qualification
+
+`prepare_editor.py` creates private PNG/linear-EXR plates, coverage observations and
+overlapping constraints from the existing downloaded master and verified prior cache.
+Prior predicted mattes are guidance inputs, not ground truth. Keep generated media
+outside this repository. `editor_matrix.py` runs selected workflows through the Mac
+client; `editor_reference.py` independently resolves their public requests and
+compares raw predictions and every EXR with direct inference, using a separate mask
+oracle. `editor_compare.py` rechecks concurrent/reused workers against those references.
+`editor_capacity.py` restricts device samples to API service intervals so independent
+reference processes do not inflate capacity figures. `runtime_regression.py` checks
+all 602 frozen baseline frames, including low-memory and legacy hint cases.
+
+Example isolated qualification after preparing `matrix.json`:
+
+```sh
+python benchmarks/api/editor_matrix.py --matrix /private/matrix.json \
+  --output /private/qualification --tokens /private/token-a /private/token-b \
+  --names sparse linear --parallel 2 --allow-testing-profile
+python -m unittest discover -s tests -p 'test_*api*.py' -q
+```
+
+Run `test_hint_mapping.py` in the GPU server's existing inference environment, with
+the candidate model package on `PYTHONPATH`; it inspects hint tensors on CPU. The
+normal Mac client refuses testing profiles unless explicitly overridden. Qualification
+uses separate storage and a separate loopback port; it must not replace the normal
+approval record until direct comparisons pass. See the [results](../../docs/service/editor-input-results.md).

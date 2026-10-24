@@ -26,6 +26,8 @@ from jsonschema import Draft202012Validator, ValidationError
 from .common import canonical, digest, public, save, stamp
 from .store import Store, Problem, ident
 from .worker import main as worker_main
+from .media import frame_path, validate_file
+from .recipes import resolve, dependencies
 
 def purge(path):
     if path.exists():
@@ -60,7 +62,9 @@ class Controller:
                 job.update(state='failed', error=self.error('controller_restarted'), updated_at=stamp())
                 self.store.put('job', owner, job)
             elif job['state'] == 'queued':
-                job['_accepted'] = time.monotonic() - max(0,time.time()-job['_created'])
+                if not any(p['execution_fingerprint']==job['recipe']['execution_fingerprint'] for p in self.cap['profiles']):
+                    job.update(state='failed',error=self.error('execution_changed'))
+                else:job['_accepted'] = time.monotonic() - max(0,time.time()-job['_created'])
                 self.store.put('job', owner, job)
         for owner, asset in self.store.all('asset'):
             if asset['state'] == 'validating':
@@ -150,11 +154,15 @@ class Controller:
             return 200, previous
         self.validate('AssetCreate', body)
         n, w, h = body['frame_count'], body['width'], body['height']
-        profile = self.cap['profiles'][0]
-        if n > profile['max_context_frames'] or w > profile['max_width'] or h > profile['max_height']:
+        if not any(n<=p['max_context_frames'] and w<=p['max_width'] and h<=p['max_height'] for p in self.cap['profiles']):
             raise Problem(422, 'input_limit')
-        if sorted(f['frame_index'] for f in body['files']) != list(range(n)):
+        indices=sorted(f['frame_index'] for f in body['files'])
+        if (len(indices)!=len(set(indices)) or any(i>=n for i in indices) or
+            (body['kind']=='image_sequence' and indices!=list(range(n)))):
             raise Problem(422, 'frame_mapping')
+        pixel=body['colour']['pixel_type']
+        expected='image/png' if pixel in ('uint8','uint16') else 'image/x-exr'
+        if any(f['media_type']!=expected for f in body['files']):raise Problem(422,'media_type_mismatch')
         t = body['timing']
         if len(t['start_pts'])>20 or len(t['frame_duration_ticks'])>19:
             raise Problem(422,'timestamp_range')
@@ -165,7 +173,7 @@ class Controller:
         if Fraction(base['num'],base['den']) * int(t['frame_duration_ticks']) != Fraction(rate['den'],rate['num']):
             raise Problem(422, 'cfr_timing')
         size = sum(f['bytes'] for f in body['files'])
-        if size > self.cap['limits']['max_asset_bytes'] or any(f['bytes'] > 16 << 20 for f in body['files']):
+        if size > self.cap['limits']['max_asset_bytes'] or any(f['bytes'] > self.cap['limits'].get('max_file_bytes',64<<20) for f in body['files']):
             raise Problem(413, 'asset_too_large')
         self.quota(owner, size)
         id = ident('asset')
@@ -189,7 +197,8 @@ class Controller:
                     if slot['upload_id'] == upload_id:
                         if a['state'] in ('expired','deleted','deleting') or a['_expires'] <= time.time():
                             raise Problem(410, 'upload_expired')
-                        return a, slot, self.asset_dir(a['id']) / 'frames' / f'{slot["frame_index"]:06d}.png'
+                        file=next(f for f in a['manifest']['files'] if f['frame_index']==slot['frame_index'])
+                        return a, slot, frame_path(self.asset_dir(a['id'])/'frames',file)
         raise Problem(404, 'not_found')
 
     def complete(self, owner, id, key, path, body):
@@ -215,26 +224,14 @@ class Controller:
 
     def validate_asset(self, owner, id, release=False):
         try:
-            from PIL import Image
             with self.lock:
                 self.validating.add(id)
                 a = self.store.get('asset', id, owner)
             for f in a['manifest']['files']:
-                p = self.asset_dir(id) / 'frames' / f'{f["frame_index"]:06d}.png'
+                p = frame_path(self.asset_dir(id)/'frames',f)
                 if p.stat().st_size != f['bytes'] or digest(p) != f['sha256']:
                     raise ValueError('checksum')
-                # Check bounded IHDR before a decoder allocates any pixel memory.
-                header = p.read_bytes()[:33]
-                import struct
-                w,h,depth,colour,compression,filtering,interlace = struct.unpack('>IIBBBBB', header[16:29])
-                if header[:8] != b'\x89PNG\r\n\x1a\n' or header[12:16] != b'IHDR' or (w,h) != (a['manifest']['width'],a['manifest']['height']) or (depth,colour,compression,filtering,interlace) != (8,2,0,0,0):
-                    raise ValueError('png_format')
-                with Image.open(p) as image:
-                    if image.format != 'PNG' or image.mode != 'RGB' or image.size != (w,h):
-                        raise ValueError('geometry')
-                    image.verify()
-                with Image.open(p) as image:
-                    image.load()
+                validate_file(p,a['manifest'],f)
             with self.lock:
                 current = self.store.get('asset', id, owner)
                 if current['state'] == 'validating':
@@ -267,13 +264,16 @@ class Controller:
         else:
             request = body
         self.validate('JobCreate', request)
-        profile = self.cap['profiles'][0]
+        profile=next((p for p in self.cap['profiles'] if p['id']==request['profile_id']),None)
         if (request['capabilities_revision'] != self.cap['capabilities_revision'] or
-            request['model_revision'] != profile['model_revision'] or request['profile_id'] != profile['id']):
+            profile is None or request['model_revision'] != profile['model_revision']):
             raise Problem(409, 'unsupported_revision')
         a = self.store.get('asset', request['asset_id'], owner)
         if a['state'] != 'ready' or a['_expires'] <= time.time():
             raise Problem(409, 'asset_not_ready')
+        media=a['manifest']
+        if media['width']>profile['max_width'] or media['height']>profile['max_height'] or media['frame_count']>profile['max_context_frames']:
+            raise Problem(422,'profile_input_limit')
         r = request['output_range']
         if not 0 <= r['start'] < r['end'] <= a['manifest']['frame_count']:
             raise Problem(422, 'frame_range')
@@ -283,11 +283,14 @@ class Controller:
             raise Problem(429, 'queue_full')
         reserve = a['manifest']['width'] * a['manifest']['height'] * a['manifest']['frame_count'] * 16
         self.quota(owner, reserve)
-        recipe = dict(model_revision=profile['model_revision'], profile_id=profile['id'],
-                      execution_fingerprint=profile['execution_fingerprint'], asset_content_sha256=a['content_sha256'],
-                      processed_range=dict(start=0,end=a['manifest']['frame_count']), output_range=r, output=request['output'])
+        def guidance_asset(id):
+            item=self.store.get('asset',id,owner)
+            if item['_expires']<=time.time():raise Problem(409,'guidance_expired')
+            return item
+        recipe,work,assets=resolve(request,a,profile,guidance_asset,self.asset_dir)
         j = dict(id=ident('job'), state='queued', request=request, recipe=recipe, attempt=0,
-                 created_at=stamp(), updated_at=stamp(), _accepted=time.monotonic(), _created=time.time(), _reserved=reserve)
+                 created_at=stamp(), updated_at=stamp(), _accepted=time.monotonic(), _created=time.time(), _reserved=reserve,
+                 _work=work,_assets=assets)
         if retry_of:
             j['retry_of'] = retry_of
         self.store.remember(owner,path,key,body,'job',j)
@@ -327,7 +330,7 @@ class Controller:
         self.store.put(kind,owner,doc)
         if kind=='asset':
             for o,j in self.store.all('job'):
-                if o==owner and j['request']['asset_id']==id and j['state']!='deleted':
+                if o==owner and id in dependencies(j) and j['state']!='deleted':
                     j['state']='deleting'
                     self.store.put('job',o,j)
         d = dict(id=ident('deletion'), resource_id=id,resource_type=kind,state='deleting',requested_at=stamp())
@@ -339,7 +342,7 @@ class Controller:
         attempt = self.job_dir(j['id']) / 'attempt-1'
         stats = json.loads((attempt / 'worker.json').read_text())
         asset = self.store.get('asset',j['request']['asset_id'],owner)
-        if asset['state'] in ('deleting','deleted','expired'):
+        if any(self.store.get('asset',id,owner)['state'] in ('deleting','deleted','expired') for id in dependencies(j)):
             j['state'] = 'cancelled'
             return
         expires = time.time()+self.cap['retention']['result_seconds']
@@ -453,10 +456,15 @@ class Controller:
                 jobs=[(o,j) for o,j in pending if o==next_owner]
                 if jobs:
                     owner,j=jobs[0]
+                    running=[self.store.get('job',slot['job']) for slot in self.slots if slot['job']]
+                    profiles={p['id']:p for p in self.cap['profiles']}
+                    exclusive=profiles[j['request']['profile_id']].get('max_parallel_jobs',2)==1
+                    if (exclusive and running) or any(profiles[x['request']['profile_id']].get('max_parallel_jobs',2)==1 for x in running):
+                        continue
                     self.owner_order.remove(owner)
                     self.owner_order.append(owner)
                     a=self.store.get('asset',j['request']['asset_id'],owner)
-                    if a['state'] not in ('ready',):
+                    if any(self.store.get('asset',id,owner)['state']!='ready' for id in dependencies(j)):
                         j['state']='cancelled'
                         self.store.put('job',owner,j)
                         continue
@@ -472,7 +480,7 @@ class Controller:
                     self.store.put('job',owner,j)
                     s.update(job=j['id'],owner=owner)
                     self.event('job_start',job=j['id'],worker=s['number'],pid=s['process'].pid)
-                    s['inbox'].put((j['id'],str(self.asset_dir(a['id'])/'frames'),str(attempt),a['manifest']['frame_count']))
+                    s['inbox'].put((j['id'],str(self.asset_dir(a['id'])/'frames'),str(attempt),a['manifest']['frame_count'],j.get('_work',{})))
         self.cleanup()
 
     def cleanup(self):
@@ -482,11 +490,11 @@ class Controller:
                 j.update(state='failed',error=self.error('queue_deadline'),updated_at=stamp())
                 self.store.put('job',owner,j)
         jobs=self.store.all('job')
-        pinned={j['request']['asset_id'] for _,j in jobs if j['state'] in ('queued','running','cancel_requested')}
+        pinned={id for _,j in jobs if j['state'] in ('queued','running','cancel_requested') for id in dependencies(j)}
         for owner,a in self.store.all('asset'):
             if a['state']=='deleting':
                 for o,j in jobs:
-                    if o==owner and j['request']['asset_id']==a['id'] and j['state']!='deleted':
+                    if o==owner and a['id'] in dependencies(j) and j['state']!='deleted':
                         j['state']='deleting'
                         self.store.put('job',o,j)
             elif a['_expires']<=time.time() and a['id'] not in pinned and a['state'] not in ('deleted','expired','validating'):
@@ -509,7 +517,7 @@ class Controller:
             elif j['state'] in ('cancelled','failed') and j['id'] not in active:
                 purge(self.job_dir(j['id']))
         for owner,a in self.store.all('asset'):
-            if a['state']=='deleting' and a['id'] not in self.validating and not any(j['request']['asset_id']==a['id'] and j['state']!='deleted' for _,j in self.store.all('job')):
+            if a['state']=='deleting' and a['id'] not in self.validating and not any(a['id'] in dependencies(j) and j['state']!='deleted' for _,j in self.store.all('job')):
                 purge(self.asset_dir(a['id']))
                 a['state']='deleted'
                 self.store.put('asset',owner,a)
@@ -629,7 +637,8 @@ class Handler(BaseHTTPRequestHandler):
             headers={'Tus-Resumable':'1.0.0','Upload-Offset':offset,'Upload-Length':f['bytes'],
                      'Upload-Expires':formatdate(a['_expires'],usegmt=True),'Cache-Control':'no-store'}
             if method=='OPTIONS':
-                headers.update({'Tus-Version':'1.0.0','Tus-Extension':'expiration,termination','Tus-Max-Size':16<<20})
+                headers.update({'Tus-Version':'1.0.0','Tus-Extension':'expiration,termination',
+                                'Tus-Max-Size':c.cap['limits'].get('max_file_bytes',64<<20)})
                 return 204,None,headers
             if self.headers.get('Tus-Resumable')!='1.0.0':
                 raise Problem(412,'tus_version')

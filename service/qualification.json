@@ -1,10 +1,27 @@
 {
-  "execution_fingerprint": "abd5279908d5ec416fdeef5916b7abbb3915479bf4e1f1bdfef199114152c9ae",
+  "execution_fingerprint": "25af457288e88a8ae978f6976f98de33184016d460470fcc18db4e37519e2f2d",
   "gpu_class": "NVIDIA RTX A5000",
   "driver_version": "580.126.09",
-  "suite_revision": "exact-inference-602-frames + api-pilot-2026-10-24-three-fixtures-one-and-two-workers",
-  "raw_prediction_frames_compared": 432,
-  "qualification_exr_files_compared": 864,
-  "timed_downloaded_exr_files_compared": 1152,
-  "scope": "Fixed native 24/12 profile, Stage 2 batch 1, RGB8 PNG inputs, float32 ZIP EXR outputs. Throughput is unqualified under clean conditions."
+  "suite_revision": "editor-inputs-2026-10-24: frozen-602 + guided-api-512 + concurrent-reuse",
+  "baseline_frames_compared": 602,
+  "raw_prediction_frames_compared": 512,
+  "qualification_exr_files_compared": 1024,
+  "profiles": [
+    {
+      "id": "native-720p-24x12",
+      "max_width": 1280,
+      "max_height": 720,
+      "max_context_frames": 72,
+      "max_parallel_jobs": 2
+    },
+    {
+      "id": "native-1080p-24x12",
+      "max_width": 1920,
+      "max_height": 1080,
+      "max_context_frames": 144,
+      "max_parallel_jobs": 1
+    }
+  ],
+  "evidence": "docs/service/editor-input-results.json",
+  "scope": "Fixed native 24/12, Stage 2 batch 1. RGB8 PNG and linear half/float EXR, hints/carry and coverage constraints. 1080p runs exclusively; default one worker. Exactness/capacity qualified; clean throughput unqualified."
 }

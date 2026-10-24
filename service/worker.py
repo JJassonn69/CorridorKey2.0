@@ -12,6 +12,30 @@ import time
 import traceback
 
 from .common import digest, save
+from .media import apply_constraints
+
+
+def normalize_work(work):
+    work=dict(work)
+    if work.get('hint'):
+        hint=dict(work['hint'])
+        hint['frames']={int(i):p for i,p in hint['frames'].items()}
+        hint['quality']={int(i):q for i,q in hint['quality'].items()}
+        work['hint']=hint
+    work['masks']=[dict(m,frames={int(i):p for i,p in m['frames'].items()}) for m in work.get('masks',[])]
+    return work
+
+
+def hint_arguments(work,limit=None):
+    hint=work.get('hint');args=dict(initial_hint_path=None,hint_video_path=None,
+        hint_precedence=work.get('carry',{}).get('precedence','provided'))
+    if not hint:return args
+    if hint['mode']=='first_frame':args['initial_hint_path']=hint['frames'][0]
+    elif hint['mode']=='sequence':args['hint_video_path']=str(Path(hint['frames'][0]).parent)
+    else:
+        frames={i:dict(path=p,quality=hint['quality'][i]) for i,p in hint['frames'].items() if limit is None or i<limit}
+        if frames:args['hint_frames']=frames
+    return args
 
 
 def main(package, inbox, events, log, capture_raw=False):
@@ -42,7 +66,8 @@ def main(package, inbox, events, log, capture_raw=False):
                 work = inbox.get()
                 if work is None:
                     return
-                job_id, source, attempt, count = work
+                job_id, source, attempt, count, recipe = work
+                recipe=normalize_work(recipe)
                 attempt = Path(attempt)
                 try:
                     random.seed(0)
@@ -53,13 +78,17 @@ def main(package, inbox, events, log, capture_raw=False):
                                           stage2_batch=1, auto_vram=False, model_scale=1,
                                           low_vram=False, output_format='exr', exr_dtype='float',
                                           outputs={'alpha', 'fg'}, temp_dir=attempt / 'scratch')
+                    cfg.frame_dir_linear=recipe.get('linear',False)
+                    cfg.carry_hint=recipe.get('carry',{}).get('enabled',True)
+                    cfg.carry_hint_quality=recipe.get('carry',{}).get('confidence',.95)
+                    cfg.hint_quality=(recipe.get('hint') or {}).get('confidence',.95)
                     # The same eight-frame warmup as the direct benchmark. Its cost is
                     # included in service latency. No numerical runtime code is changed.
                     events.put(('progress', {'id': job_id, 'phase': 'prepass', 'completed': 0}))
                     warm_start = time.monotonic()
                     run_inference(model, source, str(attempt / 'warmup'),
                                   dataclasses.replace(cfg, num_frames=min(8, count)), WriterConfig(),
-                                  initial_hint_path=None, hint_video_path=None)
+                                  **hint_arguments(recipe,min(8,count)))
                     torch.cuda.synchronize()
                     shutil.rmtree(attempt / 'warmup')
                     warm_seconds = time.monotonic() - warm_start
@@ -84,13 +113,14 @@ def main(package, inbox, events, log, capture_raw=False):
                     start = time.monotonic()
                     try:
                         run_inference(model, source, str(attempt / 'exr'), cfg, WriterConfig(),
-                                      initial_hint_path=None, hint_video_path=None)
+                                      **hint_arguments(recipe))
                         torch.cuda.synchronize()
                     finally:
                         hook.remove()
                     seconds = time.monotonic() - start
                     if len(raw) != count:
                         raise ValueError('Incomplete raw prediction count')
+                    apply_constraints(attempt/'exr',recipe.get('masks',[]))
                     files = []
                     for output in ('alpha', 'fg'):
                         matches = sorted((attempt / 'exr').glob(f'*_{output}_exr/{output}_*.exr'))

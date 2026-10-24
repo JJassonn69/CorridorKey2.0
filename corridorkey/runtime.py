@@ -470,7 +470,8 @@ def hann_stage1_stream(model, source, meta, *, reader_cls, reader_kind: str,
                        foundation_paths,
                        carry_hint_from_aux: bool,
                        carry_hint_quality: float,
-                       on_baton_frames):
+                       on_baton_frames, hint_frames=None,
+                       hint_precedence: str = "carried"):
     device = next(model.stage1.parameters()).device
     T_all = int(meta["num_frames"])
     H, W = meta["shape_hw"]
@@ -507,6 +508,7 @@ def hann_stage1_stream(model, source, meta, *, reader_cls, reader_kind: str,
     hint_reader = make_hint_reader(full_hint_video_path, meta)
     carry_cache = {}
     stage2_frame_cache = {}
+    sparse_cache = {}
 
     def flush_before(t_limit: int):
         ready = []
@@ -533,7 +535,7 @@ def hann_stage1_stream(model, source, meta, *, reader_cls, reader_kind: str,
                 hint_quality_cpu.fill_(float(full_hint_quality))
                 hint_present.fill_(True)
             for j, t_abs in enumerate(range(t0, t1)):
-                if t_abs in carry_cache:
+                if t_abs in carry_cache and not (hint_reader is not None and hint_precedence == "provided"):
                     hint_cpu[0, j] = carry_cache[t_abs]
                     hint_quality_cpu[0, j] = float(carry_hint_quality)
                     hint_present[0, j] = True
@@ -541,6 +543,19 @@ def hann_stage1_stream(model, source, meta, *, reader_cls, reader_kind: str,
                 hint_cpu[0, 0] = initial_hint.to(dtype=hint_cpu.dtype)
                 hint_quality_cpu[0, 0] = float(initial_hint_quality)
                 hint_present[0, 0] = True
+            if hint_frames is not None:
+                # Only explicitly supplied frames are observations. Missing frames
+                # remain absent; no black images, interpolation or implicit hold.
+                for t_abs in sorted(k for k in hint_frames if t0 <= k < t1):
+                    if t_abs not in sparse_cache:
+                        sparse_cache[t_abs] = load_initial_hint_frame(hint_frames[t_abs]["path"], meta)
+                    j = t_abs - t0
+                    hint_cpu[0, j] = sparse_cache[t_abs]
+                    hint_quality_cpu[0, j] = float(hint_frames[t_abs]["quality"])
+                    hint_present[0, j] = True
+                hint_quality_cpu[~hint_present] = -1.0
+                for old_t in [k for k in sparse_cache if k < t0]:
+                    del sparse_cache[old_t]
             if not bool(hint_present.any().item()):
                 hint_quality_cpu.fill_(-1.0)
 
@@ -788,7 +803,16 @@ def _release_output_writers(writers):
 
 def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
                   writer_cfg: WriterConfig, *, initial_hint_path: str | None,
-                  hint_video_path: str | None):
+                  hint_video_path: str | None, hint_frames=None,
+                  hint_precedence: str = "carried"):
+    if hint_precedence not in ("carried", "provided"):
+        raise ValueError("hint_precedence must be carried or provided")
+    if hint_frames is not None:
+        if initial_hint_path is not None or hint_video_path is not None or not hint_frames:
+            raise ValueError("Sparse keyframes are an independent hint mode")
+        for index, item in hint_frames.items():
+            if not isinstance(index, int) or isinstance(index, bool) or index < 0 or not 0 <= float(item["quality"]) <= 1:
+                raise ValueError("Invalid hint frame index or confidence")
     input_path = str(input_path)
     output_dir = str(output_dir)
     cfg.temp_dir.mkdir(parents=True, exist_ok=True)
@@ -817,6 +841,8 @@ def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
             linear_contrast=cfg.linear_contrast,
             linear_contrast_pivot=cfg.linear_contrast_pivot)
     T_all = int(meta["num_frames"])
+    if hint_frames is not None and any(k >= T_all for k in hint_frames):
+        raise ValueError("Hint keyframe outside the processed context")
     H, W = meta["shape_hw"]
     if cfg.auto_vram:
         apply_auto_vram(cfg, (H, W), T_all)
@@ -970,7 +996,8 @@ def run_inference(model, input_path: str, output_dir: str, cfg: InferenceConfig,
             rvm_path=rvm_feat_path, foundation_paths=foundation_paths,
             carry_hint_from_aux=cfg.carry_hint,
             carry_hint_quality=cfg.carry_hint_quality,
-            on_baton_frames=None if cfg.low_vram else write_prediction_batches)
+            on_baton_frames=None if cfg.low_vram else write_prediction_batches,
+            hint_frames=hint_frames, hint_precedence=hint_precedence)
 
         if cfg.low_vram:
             _phase2_setup(model)

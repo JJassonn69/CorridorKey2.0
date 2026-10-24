@@ -1,10 +1,13 @@
 # Shared CorridorKey service proposal
 
 **Status: private API pilot implemented, 2026-10-24.** See [deployment guide](pilot.md)
-and [measured results](pilot-results.md). Editor integrations remain future work.
+and [measured results](pilot-results.md). [Editor inputs](editor-inputs.md) now add
+qualified hints, sparse corrections, masks and linear EXRs; see their
+[qualification](editor-input-results.md). Editor integrations remain future work.
 Start with one host, a versioned HTTP contract, a durable bounded queue, and a
-configurable pool of persistent inference workers. Start one worker; qualify two
-on the existing roughly 22 GiB GPU before advertising concurrent GPU execution.
+configurable pool of persistent inference workers. Start one worker. Two 720p
+workers are qualified for exactness on the roughly
+22 GiB GPU; 1080p jobs run exclusively, including with two resident models.
 Many clients can upload, submit and poll independently of the active worker count.
 
 - [Inspected implementation and measurements](current-state.md)
@@ -69,8 +72,8 @@ running concurrently; a request for more concurrency must still pass admission.
 
 Reserve upload bytes at asset creation and estimated output/scratch bytes before
 job acceptance. Bound validation concurrency, decoded pixels/frames, CPU threads,
-host RAM and disk as well as VRAM. A 1 GiB input-asset limit and 4 GiB per-user
-media quota are proposed pilot policy, not measured model limits. Overall disk
+host RAM and disk as well as VRAM. A 4 GiB input-asset limit and 16 GiB per-user
+media quota are current pilot policy, not measured model limits. Overall disk
 budget/free-space floor are configured from the deployment disk. Advertise all
 effective limits. Reject overload with `429` and `Retry-After`; never silently
 shrink frames/windows or change precision to make a request fit.
@@ -112,7 +115,7 @@ and alpha: foreground is linear with the same primaries; alpha is linear coverag
 data, never gamma-transformed. Foreground is straight/unassociated; no extra
 despill or premultiplication is introduced. Explicit metadata accompanies files.
 
-Then qualify scene-linear RGB EXR half/float input, still with specified primaries.
+Scene-linear RGB EXR half/float input is now qualified, with specified primaries.
 ACES, camera log, PQ/HLG, arbitrary YUV ranges, 10/12-bit video and 16-bit PNG need
 verified conversion paths before capability enablement. A flag saying "linear"
 does not convert ACEScg to the service's RGB space. Reject unrecognised/ambiguous
@@ -141,7 +144,8 @@ Proposed TTLs: incomplete uploads 24 h from creation; ready assets 24 h after
 validation; results 24 h after completion. Accepted jobs pin input storage until
 terminal state. Set a maximum queue age and run deadline so pins cannot retain
 media indefinitely; use a provisional 10-minute queue age / 10-minute run deadline
-for the bounded pilot, then measure. TTLs do not slide on polling. Expiry/deletion
+for the initial bounded pilot. The editor revision allows 30-minute execution
+while retaining the 10-minute queue age. TTLs do not slide on polling. Expiry/deletion
 revokes new reads immediately; open transfers are checked between chunks.
 
 Delete-job requests cancel active work, revoke result reads and return a deletion

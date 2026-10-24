@@ -4,6 +4,9 @@ Inspected 2026-10-24: application commit `86df1a18bcfabc72296db6764ca1449aecf801
 based on upstream `485f5e9ab759ead6138cc990776184b59d6ea971`. All 56 Python source
 hashes match the latest acceptance manifest. This is an inspection of code and
 existing evidence, not a new performance run. See the later [API pilot results](pilot-results.md).
+This is the original optimisation snapshot. The later [editor-input revision](editor-inputs.md)
+adds optional hint branches and service inputs; its [qualification](editor-input-results.md)
+records source identity and reruns the frozen baseline.
 
 ## Entry points and execution
 
