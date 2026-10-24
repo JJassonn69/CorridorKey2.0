@@ -86,6 +86,12 @@ Progress refers to the current attempt and may reset on retry. ETA remains null
 until calibrated. Poll at server `Retry-After` (initially 2 s), backing off to 10 s;
 ETag/304 avoids retransmission. No WebSocket dependency.
 
+For latency testing, optional `server_timings` exposes measured queue and service
+seconds from the server's monotonic clock. Service time includes complete export
+and publication. Model loading inside that interval is reported separately;
+unknown values remain null. The client measures its own complete workflow and
+polling detection delay without subtracting server/client wall clocks.
+
 Cancel is a durable flag checked between prepass chunks, Hann windows, Stage 2
 batches and bounded writer waits. The GPU kernel already running is not instantly
 interruptible. After a proposed 10 s grace period, terminate and reap the worker's

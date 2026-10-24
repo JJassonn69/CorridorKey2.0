@@ -1594,6 +1594,9 @@
           },
           "error": {
             "$ref": "#/components/schemas/Problem"
+          },
+          "server_timings": {
+            "$ref": "#/components/schemas/ServerTimings"
           }
         },
         "required": [
@@ -2176,6 +2179,36 @@
           "request_id"
         ],
         "description": "RFC 9457 problem details; sanitize detail. Job failures can carry this same structured record."
+      },
+      "ServerTimings": {
+        "type": "object",
+        "description": "Optional measured durations from one server monotonic clock, for the current/final attempt. Null means unavailable. No duration is computed by subtracting client and server wall clocks.",
+        "properties": {
+          "queue_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Durable job acceptance to worker start; includes waiting for an available/ready worker."
+          },
+          "service_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Worker start through complete export, checksum validation and result publication."
+          },
+          "model_load_seconds_in_service": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Model loading inside this job service interval; zero for an already loaded model."
+          }
+        }
       }
     }
   }

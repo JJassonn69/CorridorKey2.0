@@ -1,0 +1,181 @@
+{
+  "status": "prepared; API deployment pending",
+  "acquired_by": "user download",
+  "usage": "Private personal tests; no media redistribution or model training.",
+  "fixtures": [
+    {
+      "id": "escape-s001",
+      "title": "Woman in White Stands Holding Pistol",
+      "source_url": "https://vfxassets.com/a/escape-s001",
+      "master_sha256": "45827703b8fe57501cd67b4e87c7a2e8698e919f43da0b37ff143fd07790ff7f",
+      "master_bytes": 323993828,
+      "master_dimensions": [
+        2048,
+        1156
+      ],
+      "master_codec": "ProRes 4444, yuv444p12le",
+      "master_timing": {
+        "frame_count": 204,
+        "time_base": {
+          "num": 1,
+          "den": 24000
+        },
+        "frame_rate": {
+          "num": 24000,
+          "den": 1001
+        },
+        "frame_duration_ticks": "1001"
+      },
+      "source_range": {
+        "start": 48,
+        "end": 120
+      },
+      "fixture_dimensions": [
+        1024,
+        578
+      ],
+      "fixture_frames": 72,
+      "fixture_upload_bytes": 74199126,
+      "fixture_manifest_sha256": "431c27df98c004276fc9955a4b0d62104bf4115d967f06262c33b57cdae4c9d4",
+      "transform": {
+        "ocio_version": "2.6.0",
+        "config": "studio-config-v2.2.0_aces-v1.3_ocio-v2.4",
+        "config_sha256": "df4526820a4c3c45c587b7d41306d3e2b4eb81bf2a1b1c8580237dc29133bd22",
+        "source": "S-Log3 S-Gamut3.Cine",
+        "destination": "Linear Rec.709 (sRGB)",
+        "decode": "FFmpeg ProRes -> RGB48; BT.709 YUV matrix, limited-to-full range",
+        "range_note": "Range is an explicit fixture interpretation of the untagged ProRes range, not a colour-critical source certification.",
+        "resize": "linear RGB, Pillow float-channel Lanczos, 2048x1156 -> 1024x578",
+        "encode": "sRGB transfer; clip to [0,1]; nearest integer uint8",
+        "view_transform": "none"
+      },
+      "tool_versions": {
+        "imageio-ffmpeg": "0.6.0",
+        "opencolorio": "2.6.0",
+        "numpy": "2.3.5",
+        "pillow": "12.3.0"
+      },
+      "clipping": {
+        "negative_samples": 1327542,
+        "above_one_samples": 72799,
+        "total_samples": 127844352
+      }
+    },
+    {
+      "id": "saber-s009",
+      "title": "Saber Lock Struggle Closeup",
+      "source_url": "https://vfxassets.com/a/saber-s009",
+      "master_sha256": "2cb345b0aa4c9e863d7b0e1d1724b2cadbb7b10c1d56f26539450070a4ca0c70",
+      "master_bytes": 135164052,
+      "master_dimensions": [
+        2048,
+        1156
+      ],
+      "master_codec": "ProRes 4444, yuv444p12le",
+      "master_timing": {
+        "frame_count": 81,
+        "time_base": {
+          "num": 1,
+          "den": 24
+        },
+        "frame_rate": {
+          "num": 24,
+          "den": 1
+        },
+        "frame_duration_ticks": "1"
+      },
+      "source_range": {
+        "start": 4,
+        "end": 76
+      },
+      "fixture_dimensions": [
+        1024,
+        578
+      ],
+      "fixture_frames": 72,
+      "fixture_upload_bytes": 78053503,
+      "fixture_manifest_sha256": "b1d9383c033bc2e46b1b283860384e9a32fd2bb7b231195041f2bb12de17a5e8",
+      "transform": {
+        "ocio_version": "2.6.0",
+        "config": "studio-config-v2.2.0_aces-v1.3_ocio-v2.4",
+        "config_sha256": "df4526820a4c3c45c587b7d41306d3e2b4eb81bf2a1b1c8580237dc29133bd22",
+        "source": "S-Log3 S-Gamut3.Cine",
+        "destination": "Linear Rec.709 (sRGB)",
+        "decode": "FFmpeg ProRes -> RGB48; BT.709 YUV matrix, limited-to-full range",
+        "range_note": "Range is an explicit fixture interpretation of the untagged ProRes range, not a colour-critical source certification.",
+        "resize": "linear RGB, Pillow float-channel Lanczos, 2048x1156 -> 1024x578",
+        "encode": "sRGB transfer; clip to [0,1]; nearest integer uint8",
+        "view_transform": "none"
+      },
+      "tool_versions": {
+        "imageio-ffmpeg": "0.6.0",
+        "opencolorio": "2.6.0",
+        "numpy": "2.3.5",
+        "pillow": "12.3.0"
+      },
+      "clipping": {
+        "negative_samples": 9220394,
+        "above_one_samples": 4223601,
+        "total_samples": 127844352
+      }
+    },
+    {
+      "id": "ladder-s001",
+      "title": "Man Climbs Ladder, Wide",
+      "source_url": "https://vfxassets.com/a/ladder-s001",
+      "master_sha256": "62babc68b1d229a2b76a24596fc747ef69469cc7f3dbbe71f075518febc10402",
+      "master_bytes": 191433844,
+      "master_dimensions": [
+        2048,
+        1156
+      ],
+      "master_codec": "ProRes 4444, yuv444p12le",
+      "master_timing": {
+        "frame_count": 117,
+        "time_base": {
+          "num": 1,
+          "den": 24000
+        },
+        "frame_rate": {
+          "num": 24000,
+          "den": 1001
+        },
+        "frame_duration_ticks": "1001"
+      },
+      "source_range": {
+        "start": 24,
+        "end": 96
+      },
+      "fixture_dimensions": [
+        1024,
+        578
+      ],
+      "fixture_frames": 72,
+      "fixture_upload_bytes": 74772540,
+      "fixture_manifest_sha256": "036f0c4503c7e4015c053be749e314c3b3e8e292c874e2730170eda07c4b1e50",
+      "transform": {
+        "ocio_version": "2.6.0",
+        "config": "studio-config-v2.2.0_aces-v1.3_ocio-v2.4",
+        "config_sha256": "df4526820a4c3c45c587b7d41306d3e2b4eb81bf2a1b1c8580237dc29133bd22",
+        "source": "S-Log3 S-Gamut3.Cine",
+        "destination": "Linear Rec.709 (sRGB)",
+        "decode": "FFmpeg ProRes -> RGB48; BT.709 YUV matrix, limited-to-full range",
+        "range_note": "Range is an explicit fixture interpretation of the untagged ProRes range, not a colour-critical source certification.",
+        "resize": "linear RGB, Pillow float-channel Lanczos, 2048x1156 -> 1024x578",
+        "encode": "sRGB transfer; clip to [0,1]; nearest integer uint8",
+        "view_transform": "none"
+      },
+      "tool_versions": {
+        "imageio-ffmpeg": "0.6.0",
+        "opencolorio": "2.6.0",
+        "numpy": "2.3.5",
+        "pillow": "12.3.0"
+      },
+      "clipping": {
+        "negative_samples": 3429379,
+        "above_one_samples": 663785,
+        "total_samples": 127844352
+      }
+    }
+  ]
+}

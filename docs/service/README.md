@@ -9,6 +9,7 @@ Many clients can upload, submit and poll independently of the active worker coun
 - [Inspected implementation and measurements](current-state.md)
 - [API contract](api.md) and [OpenAPI schemas](openapi.json)
 - [Scaling and vLLM / llama.cpp assessment](scaling.md)
+- [Prepared private footage and Mac latency client](../../benchmarks/api/README.md)
 - [CLI-first milestone](#cli-first-milestone)
 
 ## Components and boundaries
