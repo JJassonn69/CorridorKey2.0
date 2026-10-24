@@ -3,13 +3,13 @@
 Inspected 2026-10-24: application commit `86df1a18bcfabc72296db6764ca1449aecf8011f`,
 based on upstream `485f5e9ab759ead6138cc990776184b59d6ea971`. All 56 Python source
 hashes match the latest acceptance manifest. This is an inspection of code and
-existing evidence, not a new performance run. See [the service proposal](README.md).
+existing evidence, not a new performance run. See the later [API pilot results](pilot-results.md).
 
 ## Entry points and execution
 
 | Implemented | Service implication |
 |---|---|
-| `infer.py`: load one model, synchronously process one video or frame directory | No HTTP API or durable job lifecycle exists |
+| `infer.py`: load one model, synchronously process one video or frame directory | Original direct entry point; the separate API wrapper now supplies the job lifecycle |
 | `run_interactive.py`: guided launcher; subprocess per clip | Batch launching does not provide persistent model reuse |
 | `corridorkey.runtime.load_model()` / `run_inference()` | Useful worker boundary; not a thread-safe serving interface |
 | `RuntimePaths`, `InferenceConfig`, `WriterConfig` | Internal configuration, not a public API contract |

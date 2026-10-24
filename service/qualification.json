@@ -1,0 +1,10 @@
+{
+  "execution_fingerprint": "abd5279908d5ec416fdeef5916b7abbb3915479bf4e1f1bdfef199114152c9ae",
+  "gpu_class": "NVIDIA RTX A5000",
+  "driver_version": "580.126.09",
+  "suite_revision": "exact-inference-602-frames + api-pilot-2026-10-24-three-fixtures-one-and-two-workers",
+  "raw_prediction_frames_compared": 432,
+  "qualification_exr_files_compared": 864,
+  "timed_downloaded_exr_files_compared": 1152,
+  "scope": "Fixed native 24/12 profile, Stage 2 batch 1, RGB8 PNG inputs, float32 ZIP EXR outputs. Throughput is unqualified under clean conditions."
+}

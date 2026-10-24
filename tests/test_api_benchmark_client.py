@@ -162,7 +162,7 @@ class BenchmarkClientTests(unittest.TestCase):
                     'execution_fingerprint':'c'*64,'asset_content_sha256':'d'*64,
                     'processed_range':{'start':0,'end':1},'output_range':state['request']['output_range'],
                     'output':state['request']['output']},'files':[{'source_frame':0,'output':o,'bytes':len(exr),
-                    'width':1,'height':1,'pixel_type':'float32','channels':['A'] if o=='alpha' else ['R','G','B'],
+                    'width':1,'height':1,'pixel_type':'float32','channels':['Y'] if o=='alpha' else ['R','G','B'],
                     'colour_space':'coverage' if o=='alpha' else 'linear_srgb','alpha_association':'coverage' if o=='alpha' else 'straight',
                     'pts':'9','duration_ticks':'1',
                     'sha256':hashlib.sha256(exr).hexdigest(),'download_url':'/file/'+o} for o in ('alpha','fg')]})

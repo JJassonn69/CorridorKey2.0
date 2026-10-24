@@ -1,6 +1,7 @@
 # Shared CorridorKey service proposal
 
-**Status: design only, 2026-10-24.** No server or editor integration is implemented.
+**Status: private API pilot implemented, 2026-10-24.** See [deployment guide](pilot.md)
+and [measured results](pilot-results.md). Editor integrations remain future work.
 Start with one host, a versioned HTTP contract, a durable bounded queue, and a
 configurable pool of persistent inference workers. Start one worker; qualify two
 on the existing roughly 22 GiB GPU before advertising concurrent GPU execution.
@@ -33,7 +34,7 @@ host-specific alpha interpretation. After Effects, Premiere, Resolve/Fusion,
 Nuke, Final Cut and Blender share the media/job contract; their SDK integration
 is separate work. No host application is assumed to expose the same plugin API.
 
-Use a small Python ASGI control service behind TLS; keep PyTorch/CUDA out of its
+For public hosting, use an ASGI control service behind TLS; keep PyTorch/CUDA out of its
 request processes. SQLite on local disk holds owners, quotas, uploads, immutable
 recipes, idempotency records, jobs, worker leases and result metadata. Use WAL,
 short write transactions and bounded busy retries. Files live
@@ -171,15 +172,8 @@ Build the contract and this small loop before an editor plugin:
    explicit timing and colour. This is a deliberate pilot limit, not a model maximum.
 3. It discovers capabilities, uploads/resumes files, finalises the asset, submits
    preview/full jobs with durable idempotency keys, polls, cancels/retries as needed,
-   resumes downloads and verifies local results. Proposed UX (not implemented):
-
-   ```sh
-   ck-client capabilities
-   ck-client upload shot-manifest.json --resume
-   ck-client submit asset_ID --frames 0:72 --context entire-asset --purpose full
-   ck-client wait job_ID
-   ck-client fetch job_ID --cache ./shot-cache
-   ```
+   resumes downloads and verifies local results. The [implemented CLI](pilot.md#connect-and-process-footage)
+   covers this loop; the lifecycle runner exercises cancellation, retry and deletion.
 
 4. Compare with direct inference on exactly the same canonical files/profile:
    zero changed alpha/FG values and identical float EXR bytes. A preview subrange

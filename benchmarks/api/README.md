@@ -1,8 +1,7 @@
 # Mac client / GPU API latency tests
 
-Status, 2026-10-24: footage and client harness prepared. The API remains a design;
-no GPU API latency or concurrent-inference result has been measured by this harness.
-See the [service proposal](../../docs/service/README.md).
+Status, 2026-10-24: private API deployed and tested from the Mac. See the
+[deployment guide](../../docs/service/pilot.md) and [measured results](../../docs/service/pilot-results.md).
 
 ## Private footage fixtures
 

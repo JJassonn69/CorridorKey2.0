@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Mac-capable benchmark client for the proposed API; Python standard library only."""
+"""Mac-capable benchmark client for the private API; Python standard library only."""
 from __future__ import annotations
 
 import argparse
@@ -357,7 +357,7 @@ def run_job(client, fixture_path, profile_id, out, resume=False, timeout=600,
             expected_pts = int(asset_spec['timing']['start_pts']) + f['source_frame'] * int(asset_spec['timing']['frame_duration_ticks'])
             if (f['width'] != asset_spec['width'] or f['height'] != asset_spec['height']
                     or f['pixel_type'] != 'float32'
-                    or f['channels'] != (['A'] if alpha else ['R','G','B'])
+                    or f['channels'] != (['Y'] if alpha else ['R','G','B'])
                     or f['colour_space'] != ('coverage' if alpha else 'linear_srgb')
                     or f['alpha_association'] != ('coverage' if alpha else 'straight')
                     or int(f['pts']) != expected_pts

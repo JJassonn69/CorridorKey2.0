@@ -3,13 +3,13 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "CorridorKey shared inference API",
-    "version": "0.1.0-proposal",
-    "description": "Design only. M1 contract for a single-host service with a configurable qualified worker pool. Media/job schemas are independent of the PyTorch worker. See api.md and README.md for semantic validation, ownership, cancellation and retention rules."
+    "version": "0.1.0-pilot",
+    "description": "Private single-host pilot. HTTP/media contract is independent of the unchanged PyTorch inference implementation. See pilot.md for deployment limits and measured results."
   },
   "servers": [
     {
-      "url": "https://corridorkey.example.invalid",
-      "description": "Placeholder; no service is deployed."
+      "url": "http://127.0.0.1:18080",
+      "description": "Private loopback API via an authenticated SSH tunnel; not public HTTP."
     }
   ],
   "security": [
@@ -1637,7 +1637,7 @@
             "items": {
               "type": "string",
               "enum": [
-                "A",
+                "Y",
                 "R",
                 "G",
                 "B"
@@ -1702,7 +1702,7 @@
           "download_url",
           "expires_at"
         ],
-        "description": "Alpha: channels [A], coverage, coverage association. Foreground: [R,G,B], linear_srgb, straight. Server validates cross-field combinations."
+        "description": "Alpha: single stored channel [Y], interpreted as coverage/alpha. Foreground: [R,G,B], linear_srgb, straight. Native EXR channel names are preserved for byte identity."
       },
       "Result": {
         "type": "object",
@@ -2123,6 +2123,32 @@
               "access",
               "sponsor_processing_benefits"
             ]
+          },
+          "worker_pool": {
+            "type": "object",
+            "required": [
+              "ready",
+              "busy",
+              "starting",
+              "capture_raw"
+            ],
+            "properties": {
+              "ready": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "busy": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "starting": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "capture_raw": {
+                "type": "boolean"
+              }
+            }
           }
         },
         "required": [
@@ -2207,6 +2233,73 @@
             ],
             "minimum": 0,
             "description": "Model loading inside this job service interval; zero for an already loaded model."
+          },
+          "worker_inference_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "warmup_seconds": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "worker_peak_allocated_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "worker_peak_reserved_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "worker_pid": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "inference_start_monotonic": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Private pilot diagnostics on the same server boot clock; never subtract a client timestamp."
+          },
+          "inference_end_monotonic": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Private pilot diagnostics on the same server boot clock; never subtract a client timestamp."
+          },
+          "service_start_monotonic": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Private diagnostic on the server boot monotonic clock."
+          },
+          "service_end_monotonic": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Private diagnostic on the server boot monotonic clock."
           }
         }
       }

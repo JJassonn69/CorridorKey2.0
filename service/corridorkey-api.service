@@ -1,0 +1,19 @@
+[Unit]
+Description=Private CorridorKey inference API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/work/corridorkey2/api-pilot
+ExecStart=%h/work/corridorkey2/.venv/bin/python -m service.server --config %h/work/corridorkey2/private-api/config.json
+Environment=OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 OPENCV_IO_ENABLE_OPENEXR=1
+UMask=0077
+NoNewPrivileges=true
+KillMode=control-group
+TimeoutStopSec=20
+Restart=on-failure
+RestartSec=5
+TasksMax=256
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,311 @@
+{
+  "date": "2026-10-24",
+  "route": "Mac over authenticated SSH/ProxyJump on local network",
+  "controlled_capacity_benchmark": false,
+  "conditions": "CPU oversubscription and observed GPU thermal slowdown",
+  "runtime_sources_match_accepted_suite": true,
+  "qualification_raw_frames": 432,
+  "qualification_exr_files": 864,
+  "rows": [
+    {
+      "workers": 1,
+      "jobs": 4,
+      "frames": 288,
+      "wall_seconds": 289.00249566696584,
+      "end_to_end_fps": 0.9965311868167357,
+      "job_median_seconds": 117.69754393753828,
+      "job_p95_seconds": null,
+      "service_median_seconds": 59.57645332720131,
+      "queue_median_seconds": 12.088226541876793,
+      "worker_inference_median_seconds": 45.095737498253584,
+      "server_service_span_fps": 1.1936621595662191,
+      "inference_span_fps": 1.2809914102102808,
+      "peak_device_memory_mib_including_load": 4294,
+      "peak_device_memory_mib_active": 4294,
+      "peak_worker_allocated_gib": 3.057002067565918,
+      "peak_worker_reserved_gib": 3.5859375,
+      "temperature_range_c": [
+        63,
+        88
+      ],
+      "load_average_range": [
+        15.130859375,
+        18.52734375
+      ],
+      "host_cpu_busy_median_percent": 99.72008397480757,
+      "thermal_slowdown_samples": 36,
+      "active_samples": 210,
+      "sampling_interval_seconds": 1,
+      "exact_exr_files": 576,
+      "exact_passed": true,
+      "busy_probe": {
+        "busy_capabilities": {
+          "count": 50,
+          "errors": 0,
+          "median_ms": 10.769958957098424,
+          "p95_ms": 46.52954207267612,
+          "min_ms": 5.414500017650425,
+          "max_ms": 56.360417045652866
+        }
+      },
+      "request_summary": {
+        "asset_complete": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 16.910416481550783,
+          "p95_ms": null,
+          "min_ms": 16.423000022768974,
+          "max_ms": 63.27649997547269
+        },
+        "asset_create": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 66.89777050632983,
+          "p95_ms": null,
+          "min_ms": 30.99716699216515,
+          "max_ms": 110.08295801002532
+        },
+        "asset_delete": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 39.44195859367028,
+          "p95_ms": null,
+          "min_ms": 16.20595797430724,
+          "max_ms": 63.21754201781005
+        },
+        "asset_poll": {
+          "count": 18,
+          "errors": 0,
+          "median_ms": 16.528125444892794,
+          "p95_ms": null,
+          "min_ms": 9.220374980941415,
+          "max_ms": 65.82487502600998
+        },
+        "capabilities": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 45.55945796892047,
+          "p95_ms": null,
+          "min_ms": 15.2459159726277,
+          "max_ms": 214.0158750116825
+        },
+        "download_body": {
+          "count": 576,
+          "errors": 0,
+          "median_ms": 174.13600051077083,
+          "p95_ms": 413.42583403456956,
+          "min_ms": 14.895416097715497,
+          "max_ms": 452.012374997139
+        },
+        "download_head": {
+          "count": 576,
+          "errors": 0,
+          "median_ms": 6.570770463440567,
+          "p95_ms": 25.20333300344646,
+          "min_ms": 4.808375029824674,
+          "max_ms": 52.46729194186628
+        },
+        "job_poll": {
+          "count": 317,
+          "errors": 0,
+          "median_ms": 17.21916696988046,
+          "p95_ms": 140.49204101320356,
+          "min_ms": 5.399208981543779,
+          "max_ms": 215.75141698122025
+        },
+        "job_submit": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 60.00964547274634,
+          "p95_ms": null,
+          "min_ms": 44.86958298366517,
+          "max_ms": 72.36741692759097
+        },
+        "result_manifest": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 25.04960453370586,
+          "p95_ms": null,
+          "min_ms": 23.048458038829267,
+          "max_ms": 28.53775001130998
+        },
+        "upload_head": {
+          "count": 726,
+          "errors": 0,
+          "median_ms": 16.015478991903365,
+          "p95_ms": 68.48083401564509,
+          "min_ms": 7.100209011696279,
+          "max_ms": 275.9614170063287
+        },
+        "upload_patch": {
+          "count": 438,
+          "errors": 0,
+          "median_ms": 94.09997891634703,
+          "p95_ms": 126.04012503288686,
+          "min_ms": 12.794458074495196,
+          "max_ms": 178.6272079916671
+        }
+      },
+      "median_stage_seconds": {
+        "local_input_verification": 0.149473708064761,
+        "capabilities_and_asset_declaration": 0.10669610399054363,
+        "upload": 13.55423075001454,
+        "asset_validation_wait": 3.663895000005141,
+        "job_submission": 0.064115479006432,
+        "queue_processing_and_poll_detection": 71.72888893750496,
+        "result_manifest_download_and_local_verification": 28.858903207990807
+      }
+    },
+    {
+      "workers": 2,
+      "jobs": 4,
+      "frames": 288,
+      "wall_seconds": 284.1458631249843,
+      "end_to_end_fps": 1.013563938016301,
+      "job_median_seconds": 129.657425645506,
+      "job_p95_seconds": null,
+      "service_median_seconds": 74.60438222717494,
+      "queue_median_seconds": 0.02429112419486046,
+      "worker_inference_median_seconds": 55.8393296552822,
+      "server_service_span_fps": 1.2697931701530427,
+      "inference_span_fps": 1.3736696173314191,
+      "peak_device_memory_mib_including_load": 7755,
+      "peak_device_memory_mib_active": 7755,
+      "peak_worker_allocated_gib": 3.0545148849487305,
+      "peak_worker_reserved_gib": 3.353515625,
+      "temperature_range_c": [
+        64,
+        88
+      ],
+      "load_average_range": [
+        13.73681640625,
+        18.6708984375
+      ],
+      "host_cpu_busy_median_percent": 99.62459789250576,
+      "thermal_slowdown_samples": 36,
+      "active_samples": 199,
+      "sampling_interval_seconds": 1,
+      "exact_exr_files": 576,
+      "exact_passed": true,
+      "busy_probe": {
+        "busy_capabilities": {
+          "count": 50,
+          "errors": 0,
+          "median_ms": 11.965833546128124,
+          "p95_ms": 51.993458066135645,
+          "min_ms": 5.304208025336266,
+          "max_ms": 61.125374981202185
+        }
+      },
+      "request_summary": {
+        "asset_complete": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 44.30068749934435,
+          "p95_ms": null,
+          "min_ms": 12.781042023561895,
+          "max_ms": 81.34395896922797
+        },
+        "asset_create": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 58.334042027127,
+          "p95_ms": null,
+          "min_ms": 36.32041602395475,
+          "max_ms": 138.87191703543067
+        },
+        "asset_delete": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 64.42218751180917,
+          "p95_ms": null,
+          "min_ms": 55.99595792591572,
+          "max_ms": 147.69629202783108
+        },
+        "asset_poll": {
+          "count": 16,
+          "errors": 0,
+          "median_ms": 23.650478979106992,
+          "p95_ms": null,
+          "min_ms": 11.392624932341278,
+          "max_ms": 54.39520801883191
+        },
+        "capabilities": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 38.87329198187217,
+          "p95_ms": null,
+          "min_ms": 10.195040958933532,
+          "max_ms": 176.93770898040384
+        },
+        "download_body": {
+          "count": 576,
+          "errors": 0,
+          "median_ms": 243.99227101821452,
+          "p95_ms": 566.4634170243517,
+          "min_ms": 14.359582914039493,
+          "max_ms": 728.0231249751523
+        },
+        "download_head": {
+          "count": 576,
+          "errors": 0,
+          "median_ms": 9.294895513448864,
+          "p95_ms": 140.27550001628697,
+          "min_ms": 4.426624975167215,
+          "max_ms": 181.66162504348904
+        },
+        "job_poll": {
+          "count": 295,
+          "errors": 0,
+          "median_ms": 16.519166994839907,
+          "p95_ms": 80.99720801692456,
+          "min_ms": 5.991833051666617,
+          "max_ms": 188.35299997590482
+        },
+        "job_submit": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 49.306978937238455,
+          "p95_ms": null,
+          "min_ms": 29.44274991750717,
+          "max_ms": 73.2649581041187
+        },
+        "result_manifest": {
+          "count": 4,
+          "errors": 0,
+          "median_ms": 21.699229546356946,
+          "p95_ms": null,
+          "min_ms": 16.67699997778982,
+          "max_ms": 32.762832939624786
+        },
+        "upload_head": {
+          "count": 726,
+          "errors": 0,
+          "median_ms": 17.758853966370225,
+          "p95_ms": 134.42041701637208,
+          "min_ms": 9.261917090043426,
+          "max_ms": 184.48149994947016
+        },
+        "upload_patch": {
+          "count": 438,
+          "errors": 0,
+          "median_ms": 87.11758349090815,
+          "p95_ms": 263.4646660881117,
+          "min_ms": 14.871540945023298,
+          "max_ms": 361.4517089445144
+        }
+      },
+      "median_stage_seconds": {
+        "local_input_verification": 0.14552208344684914,
+        "capabilities_and_asset_declaration": 0.08786400000099093,
+        "upload": 15.055115500057582,
+        "asset_validation_wait": 3.161331395502202,
+        "job_submission": 0.0537312084925361,
+        "queue_processing_and_poll_detection": 75.52210264606401,
+        "result_manifest_download_and_local_verification": 38.060377249959856
+      }
+    }
+  ],
+  "throughput_change_percent": 1.709204029426692,
+  "median_latency_change_percent": 10.161538896949951
+}

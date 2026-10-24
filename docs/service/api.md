@@ -1,6 +1,6 @@
-# Proposed HTTP API v1
+# HTTP API v1
 
-Design contract, not a deployed service. [OpenAPI](openapi.json) defines the
+Implemented by the [private pilot](pilot.md). [OpenAPI](openapi.json) defines the
 wire schemas; [architecture](README.md) defines worker and storage behaviour.
 The schema is intentionally limited to the first milestone. Future supported
 formats/profiles are enabled through capability discovery and additive revisions;
